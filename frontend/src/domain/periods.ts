@@ -20,6 +20,11 @@ export function periodLabel(period: string, interval: TrendInterval): string {
   return `${y}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+// The first bucket whose range reaches the cutoff holds incomplete counts, even though it starts before the cutoff.
+export function firstIncompletePeriod(periods: string[], interval: TrendInterval, incompleteAfter: string): string | undefined {
+  return periods.find((p) => periodRange(p, interval).to >= incompleteAfter);
+}
+
 export function clampRange(range: { from: string; to: string }, bound: { from?: string; to?: string }) {
   return {
     from: bound.from && bound.from > range.from ? bound.from : range.from,

@@ -323,3 +323,16 @@ def test_pair_rows_come_from_one_index_generation(client, headers):
         assert response.json()['shared_terms'] == expected
     finally:
         index.matrix, index.positions, index.batch = saved
+
+
+def test_a_failed_sync_still_rebuilds_inference_and_the_index(client, headers, monkeypatch):
+    from cpsc360 import app as app_module
+    calls = []
+    def fail(_since):
+        raise RuntimeError('window 2 failed')
+    monkeypatch.setattr(app_module.ingest, 'sync', fail)
+    monkeypatch.setattr(app_module.ingest, 'rebuild_inference', lambda: calls.append('rebuild'))
+    monkeypatch.setattr(app_module.index, 'load', lambda: calls.append('index'))
+    response = client.post('/api/source/sync', headers=headers['mchen'])
+    assert response.status_code == 502
+    assert calls == ['rebuild', 'index']

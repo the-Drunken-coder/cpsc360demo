@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampRange, periodLabel, periodRange } from "./periods";
+import { clampRange, firstIncompletePeriod, periodLabel, periodRange } from "./periods";
 
 describe("trend periods", () => {
   it("maps a chart bucket to the inclusive report-date range it counts", () => {
@@ -15,5 +15,14 @@ describe("trend periods", () => {
   it("labels buckets the way analysts read them", () => {
     expect(periodLabel("2012-04-01", "quarter")).toBe("2012 Q2");
     expect(periodLabel("2012-04-01", "month")).toBe("2012-04");
+  });
+});
+
+describe("incomplete trend buckets", () => {
+  it("shades the bucket that contains the cutoff, not just the days after it", () => {
+    const months = ["2026-08-01", "2026-09-01", "2026-10-01"];
+    expect(firstIncompletePeriod(months, "month", "2026-09-19")).toBe("2026-09-01");
+    expect(firstIncompletePeriod(["2026-01-01", "2026-04-01", "2026-07-01"], "quarter", "2026-09-19")).toBe("2026-07-01");
+    expect(firstIncompletePeriod(months, "month", "2026-11-05")).toBeUndefined();
   });
 });

@@ -106,7 +106,7 @@ export function AnalyticsView() {
           <span className="spacer" />
           {trend.data && (
             <span className={Classes.TEXT_MUTED}>
-              Shaded: after {trend.data.incomplete_after}, publication lag leaves counts incomplete.
+              Shaded: periods that include dates after {trend.data.incomplete_after}, where publication lag leaves counts incomplete.
               {trend.data.series.some((s) => s.key === "__other__") && " “Other” is not clickable: filters cannot exclude groups."}
             </span>
           )}

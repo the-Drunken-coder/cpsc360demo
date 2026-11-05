@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import uPlot from "uplot";
 import type { TrendInterval, TrendSeries } from "../../api/types";
-import { periodLabel } from "../../domain/periods";
+import { firstIncompletePeriod, periodLabel } from "../../domain/periods";
 
 export const SERIES_COLORS = ["#4C90F0", "#EC9A3C", "#32A467", "#D69FD6", "#F0B726", "#68C1EE"];
 export const OTHER_COLOR = "#8F99A8";
@@ -35,12 +35,13 @@ export function TrendChart({ series, interval, incompleteAfter, onPick }: Props)
       return periods.map((p) => byPeriod.get(p) ?? 0);
     });
     const bars = series.length === 1;
-    const incompleteX = toSec(incompleteAfter);
+    const firstIncomplete = firstIncompletePeriod(periods, interval, incompleteAfter);
     const axisStroke = "#ABB3BF";
     const grid = { stroke: "rgba(171,179,191,0.12)", width: 1 };
 
     const shadeIncomplete = (u: uPlot) => {
-      const left = Math.max(u.valToPos(incompleteX, "x", true), u.bbox.left);
+      if (firstIncomplete === undefined) return;
+      const left = Math.max(u.valToPos(toSec(firstIncomplete), "x", true), u.bbox.left);
       const right = u.bbox.left + u.bbox.width;
       if (left >= right) return;
       const ctx = u.ctx;

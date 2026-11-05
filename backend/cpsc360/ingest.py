@@ -193,8 +193,10 @@ def main(argv: list[str]) -> None:
         bulk(args.file)
         rebuild_inference()
     elif args.command == "sync":
-        sync(args.since)
-        rebuild_inference()
+        try:
+            sync(args.since)
+        finally:
+            rebuild_inference()
     else:
         rebuild_inference()
 

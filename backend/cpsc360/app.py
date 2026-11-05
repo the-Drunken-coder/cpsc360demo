@@ -374,9 +374,12 @@ def source_status(actor: Auth):
 @app.post('/api/source/sync', response_model=list[m.IngestBatch])
 def sync_source(actor: Lead):
     try:
-        result = ingest.sync(None)
-        ingest.rebuild_inference()
-        index.load()
+        # Each sync window commits on its own, so rebuild even when a later window fails.
+        try:
+            result = ingest.sync(None)
+        finally:
+            ingest.rebuild_inference()
+            index.load()
     except Exception as exc:
         raise HTTPException(502, 'Public source sync failed') from exc
     with connection() as conn:
