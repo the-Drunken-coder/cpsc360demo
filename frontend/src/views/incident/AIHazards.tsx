@@ -10,6 +10,9 @@ export function AIHazards({ reportNo, results }: { reportNo: string; results: AI
     {results.map((result) => <article key={result.model}>
       <p><strong>AI-generated · {result.model} · {result.prompt_version}</strong></p>
       <p className="muted">{result.classified_by?.display_name ?? "Unknown user"} · {result.classified_at}</p>
+      {result.stale && <Callout intent="warning" icon="history">
+        The report changed after this classification. Its quotes were checked against the earlier version. Classify again to refresh.
+      </Callout>}
       {result.status === "error" ? <Callout intent="danger">{result.error}</Callout> : <>
         {result.hazards.length === 0 && <p>No hazards with verified evidence.</p>}
         {result.hazards.map((hazard) => <div key={hazard.hazard}>

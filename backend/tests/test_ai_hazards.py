@@ -150,3 +150,18 @@ def test_upstream_echo_cannot_expose_key_in_dropped_claim(go_client):
     assert 'sk-private-test-key-ABCD' not in response.text
     response = client.get('/api/incidents/' + ids[0], headers=headers['viewer'])
     assert 'sk-private-test-key-ABCD' not in response.text
+
+
+def test_results_classified_against_an_older_source_version_are_stale():
+    report = '20261019-3731E-2147307627'
+    client = TestClient(app)
+    headers = {'jrivera': {'Authorization': 'Bearer ' + client.post('/api/session', json={'handle': 'jrivera'}).json()['token']}}
+    with connection() as conn:
+        conn.execute("INSERT INTO inference.ai_hazard (report_no, model, prompt_version, status, hazards, dropped, source_sha256) VALUES (%s, '[test]-model', 'ai-hazards-v1', 'ok', '[]', '[]', 'not-the-current-version')", (report,))
+    try:
+        detail = client.get(f'/api/incidents/{report}', headers=headers['jrivera']).json()
+        result = next(r for r in detail['inferred']['ai_hazards'] if r['model'] == '[test]-model')
+        assert result['stale'] is True
+    finally:
+        with connection() as conn:
+            conn.execute("DELETE FROM inference.ai_hazard WHERE model = '[test]-model'")

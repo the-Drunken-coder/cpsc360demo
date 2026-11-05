@@ -50,6 +50,7 @@ class AIHazardResult(BaseModel):
     error: str | None
     classified_by: User | None
     classified_at: datetime
+    stale: bool
 
 
 class Filters(BaseModel):

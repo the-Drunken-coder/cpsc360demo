@@ -254,3 +254,5 @@ CREATE TABLE IF NOT EXISTS inference.ai_hazard (
     classified_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (report_no, model)
 );
+-- The source version the model read; a result is stale once the report's current version differs.
+ALTER TABLE inference.ai_hazard ADD COLUMN IF NOT EXISTS source_sha256 text;

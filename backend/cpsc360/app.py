@@ -438,13 +438,13 @@ async def go_models(actor: Auth):
 
 
 def ai_result(conn, row):
-    return m.AIHazardResult(**{**row,
+    return m.AIHazardResult(**{**row, 'stale': row.get('stale', False),
         'hazards': [{**h, 'label': HAZARD_LABELS[h['hazard']]} for h in row['hazards']],
         'classified_by': w.user(conn, row['classified_by']) if row['classified_by'] else None})
 
 
 def ai_results(conn, report_no):
-    return [ai_result(conn, row) for row in conn.execute('SELECT * FROM inference.ai_hazard WHERE report_no=%s ORDER BY classified_at DESC', (report_no,))]
+    return [ai_result(conn, row) for row in conn.execute('SELECT a.*, a.source_sha256 IS DISTINCT FROM i.current_sha256 AS stale FROM inference.ai_hazard a JOIN source.incident i USING (report_no) WHERE a.report_no=%s ORDER BY a.classified_at DESC', (report_no,))]
 
 
 @app.post('/api/ai/hazards', response_model=list[m.AIHazardResult])
@@ -471,8 +471,8 @@ async def classify_hazards(body: m.AISelection, actor: Writer):
             except (ValueError, TypeError) as exc:
                 error = f'Invalid hazard JSON: {exc}'
         with connection() as conn:
-            saved = conn.execute('INSERT INTO inference.ai_hazard (report_no,model,prompt_version,status,hazards,dropped,raw_response,error,classified_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (report_no,model) DO UPDATE SET prompt_version=excluded.prompt_version,status=excluded.status,hazards=excluded.hazards,dropped=excluded.dropped,raw_response=excluded.raw_response,error=excluded.error,classified_by=excluded.classified_by,classified_at=now() RETURNING *',
-                (row['report_no'], setting['model'], ai_hazards.PROMPT_VERSION, 'error' if error else 'ok', Jsonb(hazards), Jsonb(dropped), raw, error, actor.id)).fetchone()
+            saved = conn.execute('INSERT INTO inference.ai_hazard (report_no,model,prompt_version,status,hazards,dropped,raw_response,error,classified_by,source_sha256) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (report_no,model) DO UPDATE SET source_sha256=excluded.source_sha256,prompt_version=excluded.prompt_version,status=excluded.status,hazards=excluded.hazards,dropped=excluded.dropped,raw_response=excluded.raw_response,error=excluded.error,classified_by=excluded.classified_by,classified_at=now() RETURNING *',
+                (row['report_no'], setting['model'], ai_hazards.PROMPT_VERSION, 'error' if error else 'ok', Jsonb(hazards), Jsonb(dropped), raw, error, actor.id, row['current_sha256'])).fetchone()
             return ai_result(conn, saved), upstream_status
 
     results = await asyncio.gather(*(classify(row) for row in rows))

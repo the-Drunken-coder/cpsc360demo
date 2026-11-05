@@ -230,4 +230,5 @@ export interface AIHazardResult {
   hazards: { hazard: HazardKey; label: string; evidence: string[] }[];
   dropped: { claim: unknown; reason: string }[];
   error: string | null; classified_by: User | null; classified_at: string;
+  stale: boolean;  // the report changed after this classification
 }
