@@ -10,6 +10,7 @@ def models():
     return {'data': [
         {'id': 'deepseek-v4.1-flash', 'api': {'chat-completions': {}}},
         {'id': 'glm-5.3-flash', 'api': {'chat-completions': {}}},
+        {'id': 'glm-5.3-flash', 'api': {'chat-completions': {}}},
         {'id': 'messages-only', 'api': {'messages': {}}},
     ]}
 

@@ -3,7 +3,8 @@ import time
 
 import httpx
 
-DEFAULT_MODEL = 'deepseek-v4.1-flash'
+# Open weights, cheap, and served in the US/EU, so it works under Go's default region setting.
+DEFAULT_MODEL = 'glm-5.3-flash'
 DEFAULT_BASE_URL = 'https://opencode.ai/inference/go'
 _model_cache: tuple[str, float, list[str]] | None = None
 
