@@ -26,6 +26,8 @@ body { background: var(--bg); color: var(--text); font-size: 13px; }
 .shell { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .app-navbar.bp5-navbar { height: 40px; padding: 0 10px; flex: none; background: var(--panel); box-shadow: 0 1px 0 var(--line); }
 .app-navbar .bp5-navbar-group { height: 40px; gap: 2px; }
+.source-status-line { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.source-status-line:hover { color: inherit; }
 .brand { font-weight: 700; letter-spacing: 0.04em; margin-right: 8px; }
 .brand span { color: var(--blue); }
 .main { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }

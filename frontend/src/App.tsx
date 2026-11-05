@@ -15,6 +15,7 @@ import { InvestigationView } from "./views/investigations/InvestigationView";
 import { InvestigationsList } from "./views/investigations/InvestigationsList";
 import { SourceView } from "./views/source/SourceView";
 import { SelectionBadge } from "./components/SelectionBadge";
+import { SourceStatusLine } from "./components/SourceStatusLine";
 
 export function App() {
   return (
@@ -23,7 +24,7 @@ export function App() {
     )}>
       <div className="app">
         <div className="prototype-notice" role="note">
-          Prototype · public SaferProducts.gov data only · not an official CPSC system
+          Prototype · public SaferProducts.gov data only · not an official CPSC system · workspace changes are attributed and audited
         </div>
         <SessionProvider>
           <SelectionProvider>
@@ -62,6 +63,8 @@ function Shell() {
           ))}
         </NavbarGroup>
         <NavbarGroup align={Alignment.RIGHT}>
+          <SourceStatusLine />
+          <NavbarDivider />
           <SelectionBadge />
           <Button minimal icon="search" onClick={() => setOmnibarOpen(true)} className="omnibar-trigger">
             Jump to… <Tag minimal className="kbd">Ctrl K</Tag>
