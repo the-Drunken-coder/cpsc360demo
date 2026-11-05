@@ -14,12 +14,16 @@ from .models import Filters, IncidentSummary, Reason
 
 JOIN = ''' FROM source.incident i
 JOIN inference.incident_norm n USING (report_no)
+LEFT JOIN inference.manufacturer mf ON mf.manufacturer_key=n.manufacturer_key
 LEFT JOIN source.severity_level s ON s.label=i.severity '''
 FIELDS = '''i.*, n.manufacturer_key,n.brand_key,n.model_key,n.method,
+coalesce(mf.display_name, i.manufacturer_name) manufacturer_display_name,
 coalesce(s.rank,0) severity_rank, coalesce(s.is_injury,false) is_injury,
 (coalesce(i.company_comments,'') <> '') has_company_comment,
 ARRAY(SELECT hazard FROM inference.incident_hazard h WHERE h.report_no=i.report_no ORDER BY hazard) hazards,
 ARRAY(SELECT investigation_id FROM workspace.investigation_incident w WHERE w.report_no=i.report_no ORDER BY investigation_id) investigation_ids'''
+# Matching compares canonical keys; people read the reported spelling.
+KEY_LABELS = {'manufacturer_key': ('manufacturer', 'manufacturer_display_name'), 'brand_key': ('brand', 'brand'), 'model_key': ('model', 'model'), 'product_code': ('product type', 'product_type')}
 FACETS = ['product_category', 'product_code', 'manufacturer_key', 'hazard', 'severity', 'state', 'submitter_category']
 
 
@@ -157,9 +161,10 @@ def pair_reasons(a, b):
         reasons.append(Reason(kind=kind, weight=REASON_WEIGHTS[kind] * multiplier, detail=detail, **extra))
     if b['report_no'] in a['associated_report_nos'] or a['report_no'] in b['associated_report_nos']:
         add('associated_report', 'The published reports explicitly associate this pair.')
-    for field, kind, label in [('model_key', 'same_model', 'model'), ('manufacturer_key', 'same_manufacturer', 'manufacturer'), ('brand_key', 'same_brand', 'brand'), ('product_code', 'same_product_type', 'product code')]:
+    for field, kind in [('model_key', 'same_model'), ('manufacturer_key', 'same_manufacturer'), ('brand_key', 'same_brand'), ('product_code', 'same_product_type')]:
         if a[field] is not None and a[field] == b[field]:
-            add(kind, f'Same {label}: {a[field]}')
+            noun, label_field = KEY_LABELS[field]
+            add(kind, f'Same {noun}: {a[label_field] or a[field]}')
     hazards = sorted(set(a['hazards']) & set(b['hazards']))
     if hazards:
         add('shared_hazard', 'Shared inferred hazards: ' + ', '.join(derive.HAZARD_LABELS[h] for h in hazards), min(len(hazards), 2), hazards=hazards)

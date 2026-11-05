@@ -7,7 +7,7 @@ from psycopg.types.json import Jsonb
 
 from . import models as m
 from .derive import HAZARD_LABELS
-from .search import index, reports, summary
+from .search import KEY_LABELS, index, reports, summary
 
 TRANSITIONS = {
     'open': {'in_review': {'analyst', 'lead'}},
@@ -71,7 +71,9 @@ def patterns(conn, ids):
         groups = defaultdict(list)
         for row in rows:
             groups[row[field]].append(row['report_no'])
-        agreements.append({'field': field, 'values': [{'value': value, 'label': value or 'Not reported', 'report_nos': group} for value, group in sorted(groups.items(), key=lambda p: (-len(p[1]), p[0] or ''))]})
+        label_field = KEY_LABELS.get(field, (None, field))[1]
+        labels = {row[field]: row[label_field] or row[field] for row in rows}
+        agreements.append({'field': field, 'values': [{'value': value, 'label': labels[value] or 'Not reported', 'report_nos': group} for value, group in sorted(groups.items(), key=lambda p: (-len(p[1]), p[0] or ''))]})
     hazards, severities = defaultdict(list), defaultdict(list)
     for row in rows:
         for hazard in row['hazards']:
@@ -106,7 +108,7 @@ def generate_summary(conn, id, actor):
             if field.field in ['model_key', 'brand_key', 'manufacturer_key']:
                 for group in field.values:
                     if group.value and len(group.report_nos) >= 2:
-                        claim('Product concentration', f'{len(group.report_nos)} reports share {field.field}: {group.value}.', group.report_nos)
+                        claim('Product concentration', f'{len(group.report_nos)} reports share {KEY_LABELS[field.field][0]}: {group.label}.', group.report_nos)
         for term in analysis.shared_terms:
             claim('Narrative themes', f'Shared distinctive term "{term.term}" in {len(term.report_nos)} reports.', term.report_nos)
         responses = [r['report_no'] for r in rows if r['has_company_comment']]

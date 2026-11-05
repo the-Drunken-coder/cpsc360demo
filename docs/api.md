@@ -62,7 +62,7 @@ interface IncidentSummary {
   victim_age: number | null;
   has_company_comment: boolean;
   hazards: HazardKey[];            // inferred
-  snippet: string;                 // first ~240 chars of the narrative, or a ts_headline excerpt when q is set; <mark> tags only
+  snippet: string;                 // HTML-escaped excerpt of the narrative; the only markup is <mark> around query matches
   investigation_ids: number[];     // analyst
 }
 
@@ -279,7 +279,7 @@ Every analytics response carries `measure: "report_count"` and `caveat`. The cav
 
 ```ts
 interface Spike { key: string; label: string; recent_count: number; expected_count: number; ratio: number; z: number;
-  filters: Filters }   // filters that reproduce the recent window in the explorer
+  filters: Filters }   // only the filters that are set; they reproduce the recent window in the explorer
 ```
 
 `spike-poisson-v1`: the window ends 30 days before the newest report date, to skip the incomplete tail. The baseline is the 365 days before the window, scaled to the window length. `z = (recent - expected) / sqrt(max(expected, 1))`. Keep rows with `recent_count >= min_count` and `z >= 3`, sorted by z.

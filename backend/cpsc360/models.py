@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 Role = Literal['analyst', 'lead', 'viewer']
 Status = Literal['open', 'in_review', 'escalated', 'closed']
@@ -386,6 +386,10 @@ class Spike(BaseModel):
     ratio: float
     z: float
     filters: Filters
+
+    @field_serializer('filters')
+    def only_set_filters(self, filters: Filters):
+        return filters.model_dump(mode='json', exclude_defaults=True)
 
 
 class Spikes(Measure):
