@@ -66,6 +66,7 @@ HAZARDS: list[Hazard] = [
     _rule("structural", "Structural / mechanical failure", r"collaps\w*", r"broke (?:off|apart|loose)", r"snapped", r"came apart", r"fell apart", r"detach\w*", r"came loose"),
     _rule("battery", "Battery failure", r"batter(?:y|ies) (?:swell\w*|swollen|leak\w*|overheat\w*|explod\w*|caught fire)", r"lithium", r"swollen batter(?:y|ies)"),
     _rule("drowning", "Drowning / submersion", r"drown\w*", r"submerg\w*"),
+    _rule("skin_irritation", "Skin irritation / allergic reaction", r"rash(?:es)?", r"hives", r"irritat\w*", r"allergic reactions?", r"redness", r"itch(?:y|ing|es)?", r"dermatitis"),
 ]
 HAZARD_LABELS = {hazard.key: hazard.label for hazard in HAZARDS}
 

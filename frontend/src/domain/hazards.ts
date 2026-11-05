@@ -16,6 +16,7 @@ export const HAZARD_LABELS: Record<HazardKey, string> = {
   suffocation: "Suffocation / strangulation",
   tip_over: "Tip-over",
   drowning: "Drowning / submersion",
+  skin_irritation: "Skin irritation / allergic reaction",
 };
 
 export function isHazardKey(value: string): value is HazardKey {

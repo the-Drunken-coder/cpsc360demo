@@ -39,7 +39,7 @@ interface User { id: number; handle: string; display_name: string; role: Role }
 
 ```ts
 type HazardKey = "fire" | "overheating" | "electrical" | "burn" | "shatter_explosion" | "laceration" | "choking"
-  | "suffocation" | "entrapment" | "fall" | "tip_over" | "chemical" | "structural" | "battery" | "drowning";
+  | "suffocation" | "entrapment" | "fall" | "tip_over" | "chemical" | "structural" | "battery" | "drowning" | "skin_irritation";
 
 interface HazardTag { hazard: HazardKey; label: string; evidence: string[]; method: string } // inferred
 

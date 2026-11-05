@@ -54,3 +54,8 @@ def test_hazard_tags_keep_the_matched_phrases():
     assert tags["shatter_explosion"] == ["shattered"]
     assert tags["burn"] == ["burned"]
     assert "fire" not in tags
+
+
+def test_rash_reports_are_tagged_as_skin_irritation():
+    tags = tag_hazards("Week old daughter has severe rashes and redness all where the diapers touching.")
+    assert tags["skin_irritation"] == ["rashes", "redness"]

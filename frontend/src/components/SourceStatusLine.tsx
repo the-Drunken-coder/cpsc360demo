@@ -8,8 +8,9 @@ export function SourceStatusLine() {
   if (!status.data) return null;
   const { incident_count, newest_report_date, newest_publication_date } = status.data;
   return (
-    <Link to="/source" className="source-status-line" title="Ingest batches and sync">
-      {fmtCount(incident_count)} public reports · newest submitted {newest_report_date} · published {newest_publication_date}
+    <Link to="/source" className="source-status-line"
+      title={`Newest report submitted ${newest_report_date}, published ${newest_publication_date}. Open ingest batches and sync.`}>
+      {fmtCount(incident_count)} reports · through {newest_publication_date}
     </Link>
   );
 }

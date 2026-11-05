@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_serializer
 
 Role = Literal['analyst', 'lead', 'viewer']
 Status = Literal['open', 'in_review', 'escalated', 'closed']
-HazardKey = Literal['fire', 'overheating', 'electrical', 'burn', 'shatter_explosion', 'laceration', 'choking', 'suffocation', 'entrapment', 'fall', 'tip_over', 'chemical', 'structural', 'battery', 'drowning']
+HazardKey = Literal['fire', 'overheating', 'electrical', 'burn', 'shatter_explosion', 'laceration', 'choking', 'suffocation', 'entrapment', 'fall', 'tip_over', 'chemical', 'structural', 'battery', 'drowning', 'skin_irritation']
 Sort = Literal['relevance', 'report_date', '-report_date', 'severity', 'publication_date']
 ReasonKind = Literal['associated_report', 'same_model', 'same_brand', 'same_manufacturer', 'same_product_type', 'shared_hazard', 'text_similarity']
 
