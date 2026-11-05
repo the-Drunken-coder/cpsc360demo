@@ -2,20 +2,20 @@ import type { HazardKey } from "../api/types";
 
 export const HAZARD_LABELS: Record<HazardKey, string> = {
   fire: "Fire",
-  overheating: "Overheating",
-  electrical: "Electrical",
-  burn: "Burn",
-  shatter_explosion: "Shatter / explosion",
-  laceration: "Laceration",
-  choking: "Choking",
-  suffocation: "Suffocation",
-  entrapment: "Entrapment",
+  overheating: "Overheating / melting",
+  burn: "Burn / scald",
+  shatter_explosion: "Shattering / explosion",
   fall: "Fall",
+  electrical: "Electrical shock / arcing",
+  structural: "Structural / mechanical failure",
+  chemical: "Chemical / toxic exposure",
+  laceration: "Laceration / cut",
+  choking: "Choking / ingestion",
+  entrapment: "Entrapment / pinching / crushing",
+  battery: "Battery failure",
+  suffocation: "Suffocation / strangulation",
   tip_over: "Tip-over",
-  chemical: "Chemical",
-  structural: "Structural failure",
-  battery: "Battery",
-  drowning: "Drowning",
+  drowning: "Drowning / submersion",
 };
 
 export function isHazardKey(value: string): value is HazardKey {

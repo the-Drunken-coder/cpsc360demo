@@ -16,13 +16,19 @@ interface Props {
   onSort: (sort: IncidentSort) => void;
 }
 
+const CHECK_WIDTH = 30;
+const FLEX_MIN_WIDTH = 200;
+
 export function ResultsTable({ rows, columns, sort, cursor, isSelected, onToggle, onToggleAll, onFocusRow, onOpenRow, onSort }: Props) {
   const cursorRef = useRef<HTMLTableRowElement | null>(null);
-  useEffect(() => cursorRef.current?.scrollIntoView({ block: "nearest" }), [cursor]);
+  useEffect(() => {
+    cursorRef.current?.scrollIntoView({ block: "nearest" });
+  }, [cursor]);
   const selectedCount = rows.filter((r) => isSelected(r.report_no)).length;
+  const minWidth = columns.reduce((sum, c) => sum + (c.width ?? FLEX_MIN_WIDTH), CHECK_WIDTH);
 
   return (
-    <table className="results-table bp5-html-table bp5-compact bp5-interactive">
+    <table className="results-table bp5-html-table bp5-compact bp5-interactive" style={{ minWidth }}>
       <thead>
         <tr>
           <th className="col-check">

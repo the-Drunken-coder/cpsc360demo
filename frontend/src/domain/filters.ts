@@ -89,3 +89,14 @@ export function explorerHref(filters: Filters, extra: Record<string, string | un
   const qs = toSearchParams(filters, extra).toString();
   return qs ? `/?${qs}` : "/";
 }
+
+export function compactFilters(raw: Record<string, unknown>): Filters {
+  const params = new URLSearchParams();
+  for (const key of FILTER_KEYS) {
+    const value = raw[key];
+    if (value === null || value === undefined || value === "") continue;
+    if (Array.isArray(value)) value.forEach((v) => params.append(key, String(v)));
+    else params.set(key, String(value));
+  }
+  return parseFilters(params);
+}

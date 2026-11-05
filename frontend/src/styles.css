@@ -68,9 +68,8 @@ mark, .term-mark { background: rgba(251, 208, 101, 0.28); color: inherit; paddin
 .facet-active.bp5-tag { min-height: 14px; font-size: 10px; padding: 0 5px; }
 .facet-value.bp5-control { margin: 0; padding-left: 22px; min-height: 20px; display: flex; font-size: 12px; }
 .facet-value .bp5-control-indicator { margin-top: 2px; }
-.facet-value .facet-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.facet-value > span:not(.bp5-control-indicator) { display: flex; flex: 1; min-width: 0; }
-.facet-count { color: var(--dim); font-variant-numeric: tabular-nums; margin-left: 6px; font-size: 11px; }
+.facet-value .facet-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.facet-value .facet-count { flex: none; color: var(--dim); font-variant-numeric: tabular-nums; margin-left: 6px; font-size: 11px; }
 .facet-note { font-size: 11px; margin-top: 2px; }
 .facet-more.bp5-button { font-size: 11px; min-height: 20px; }
 .date-range { display: flex; align-items: center; gap: 4px; }
@@ -116,6 +115,7 @@ mark, .term-mark { background: rgba(251, 208, 101, 0.28); color: inherit; paddin
   font-size: 12px; box-shadow: inset 0 -1px 0 rgba(56, 62, 71, 0.6) !important;
 }
 .results-table tbody tr { cursor: default; }
+.results-table .hazard-tags { flex-wrap: nowrap; overflow: hidden; max-width: 100%; }
 .results-table tbody tr.selected td { background: var(--selected); }
 .results-table tbody tr.cursor td { background: var(--cursor); }
 .results-table tbody tr.cursor td:first-child { box-shadow: inset 3px 0 0 var(--blue), inset 0 -1px 0 var(--line) !important; }
@@ -261,7 +261,7 @@ mark, .term-mark { background: rgba(251, 208, 101, 0.28); color: inherit; paddin
 .note-head { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
 .note-body { white-space: pre-wrap; line-height: 1.5; }
 .note-cites { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 11px; }
-.summary-layout { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 20px; }
+.summary-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; }
 .summary { max-width: 900px; }
 .summary-label.bp5-callout { margin-bottom: 10px; }
 .summary-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 12px; }

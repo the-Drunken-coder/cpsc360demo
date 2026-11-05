@@ -51,7 +51,7 @@ export function IncidentView() {
           <span className="mono">{r.report_no}</span>
           <span>Reported {r.report_date}</span>
           <span>Published {r.publication_date}</span>
-          <Tag minimal intent={r.severity.toLowerCase().includes("death") ? "danger" : r.severity.toLowerCase().includes("injury") ? "warning" : "none"}>
+          <Tag minimal intent={r.severity.startsWith("Death") ? "danger" : r.severity.startsWith("Injury") ? "warning" : "none"}>
             {r.severity}
           </Tag>
           <span>{r.manufacturer_name}</span>

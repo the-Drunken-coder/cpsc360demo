@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Classes, HTMLSelect, NonIdealState, Spinner, Tooltip } from "@blueprintjs/core";
+import { AnchorButton, Button, ButtonGroup, Classes, HTMLSelect, NonIdealState, Spinner, Tooltip } from "@blueprintjs/core";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { ActiveFilters } from "../../components/ActiveFilters";
 import { useInvestigate } from "../../components/InvestigateProvider";
 import { BulkActions, compareHref } from "../../components/SelectionBadge";
 import { fmtCount } from "../../components/text";
+import { toSearchParams } from "../../domain/filters";
 import { toast, toastError } from "../../components/toaster";
 import { useRegisteredHotkeys } from "../../hotkeys/registry";
 import { useSelection } from "../../session/SelectionProvider";
@@ -92,7 +93,7 @@ export function ExplorerView() {
         <div className="results-toolbar">
           <span className="result-count">
             {results.data ? <><strong>{fmtCount(results.data.total)}</strong> reports</> : <Spinner size={14} />}
-            {results.data && <span className={Classes.TEXT_MUTED}> · {results.data.took_ms} ms</span>}
+            {results.data && <span className={Classes.TEXT_MUTED}> · {Math.round(results.data.took_ms)} ms</span>}
             {results.isFetching && results.data && <Spinner size={12} className="inline-spinner" />}
           </span>
           <ActiveFilters filters={filters} facets={facets.data} onChange={setFilters} />
@@ -105,6 +106,11 @@ export function ExplorerView() {
             onChange={(e) => update({ sort: e.currentTarget.value as IncidentSort, page: 1 })}>
             {sortOptions.map((s) => <option key={s} value={s}>{SORT_LABELS[s]}</option>)}
           </HTMLSelect>
+          <Tooltip content="Trend, breakdown, and spikes for these filters">
+            <AnchorButton small minimal icon="timeline-bar-chart" text="Trend"
+              href={`/analytics?${toSearchParams(filters).toString()}`}
+              onClick={(e) => { e.preventDefault(); navigate(`/analytics?${toSearchParams(filters).toString()}`); }} />
+          </Tooltip>
           <ColumnChooser visible={visible} onChange={setVisible} />
           <Tooltip content="Current raw rows with original headers, up to 10,000">
             <Button small minimal icon="download" text="CSV" loading={exporting} onClick={() => void exportCsv()} />

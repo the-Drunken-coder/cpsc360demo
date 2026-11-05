@@ -10,8 +10,13 @@ export function ReportLink({ reportNo, tab }: { reportNo: string; tab?: "related
   );
 }
 
+function decodeEntities(text: string): string {
+  if (!text.includes("&")) return text;
+  return new DOMParser().parseFromString(text, "text/html").documentElement.textContent ?? text;
+}
+
 export function Marked({ html }: { html: string }) {
-  const parts = html.split(/(<mark>|<\/mark>)/);
+  const parts = html.split(/(<mark>|<\/mark>)/).map((p) => (p === "<mark>" || p === "</mark>" ? p : decodeEntities(p)));
   let inMark = false;
   const out: JSX.Element[] = [];
   parts.forEach((part, i) => {

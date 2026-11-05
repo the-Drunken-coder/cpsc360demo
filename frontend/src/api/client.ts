@@ -1,4 +1,4 @@
-import { toSearchParams } from "../domain/filters";
+import { compactFilters, toSearchParams } from "../domain/filters";
 import type {
   AuditEntry, BreakdownDimension, BreakdownResponse, Facets, Filters, IncidentDetail, IncidentPage, IncidentSort,
   IngestBatch, Investigation, InvestigationStatus, InvestigationSummaryRow, Note, PatternAnalysis, RelatedIncident,
@@ -112,7 +112,9 @@ export const api = {
   generateSummary: (id: number) => json<SummarySnapshot>("POST", `/investigations/${id}/summary`),
   summaries: (id: number) => json<SummarySnapshot[]>("GET", `/investigations/${id}/summaries`),
 
-  savedSearches: () => json<SavedSearch[]>("GET", "/saved-searches"),
+  savedSearches: async () => (await json<SavedSearch[]>("GET", "/saved-searches")).map((s) => ({
+    ...s, query: { ...compactFilters(s.query as Record<string, unknown>), sort: s.query.sort ?? undefined },
+  })),
   createSavedSearch: (name: string, query: SavedQuery) => json<SavedSearch>("POST", "/saved-searches", { name, query }),
   deleteSavedSearch: (id: number) => none("DELETE", `/saved-searches/${id}`),
 
@@ -120,10 +122,12 @@ export const api = {
     json<TrendResponse>("GET", "/analytics/trend", undefined, toSearchParams(filters, { interval, group_by: groupBy, top })),
   breakdown: (filters: Filters, dimension: BreakdownDimension, limit = 20) =>
     json<BreakdownResponse>("GET", "/analytics/breakdown", undefined, toSearchParams(filters, { dimension, limit })),
-  spikes: (dimension: SpikeDimension, windowDays = 90, minCount = 8, limit = 25) =>
-    json<SpikesResponse>("GET", "/analytics/spikes", undefined, {
+  spikes: async (dimension: SpikeDimension, windowDays = 90, minCount = 8, limit = 25) => {
+    const res = await json<SpikesResponse>("GET", "/analytics/spikes", undefined, {
       dimension, window_days: windowDays, min_count: minCount, limit,
-    }),
+    });
+    return { ...res, rows: res.rows.map((r) => ({ ...r, filters: compactFilters(r.filters as Record<string, unknown>) })) };
+  },
 
   sourceStatus: () => json<SourceStatus>("GET", "/source/status"),
   sync: () => json<IngestBatch[]>("POST", "/source/sync"),
