@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 NORM_METHOD = "keys-v1"
-HAZARD_METHOD = "hazard-rules-v1"
+HAZARD_METHOD = "hazard-rules-v2"
 
 _PLACEHOLDERS = {
     "unknown", "unk", "na", "n/a", "none", "no", "idk", "idontknow", "notsure", "unsure",
