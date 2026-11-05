@@ -19,6 +19,17 @@ const AGREEMENT_LABELS: Record<AgreementField, string> = {
   severity: "Severity",
 };
 
+// Cells show each report's own reported spelling; the canonical key only decides which cells share a color.
+const REPORTED_VALUE: Record<AgreementField, (d: IncidentDetail) => string | null> = {
+  manufacturer_key: (d) => d.reported.manufacturer_name,
+  brand_key: (d) => d.reported.brand,
+  model_key: (d) => d.reported.model,
+  product_code: (d) => d.reported.product_type ?? d.reported.product_code,
+  product_category: (d) => d.reported.product_category,
+  state: (d) => d.reported.state,
+  severity: (d) => d.reported.severity,
+};
+
 const GROUP_CLASSES = 5;
 
 type Agreement = Map<string, { label: string; group: number | null }>;
@@ -75,11 +86,13 @@ export function CompareView() {
           {allSame ? <Tag minimal intent="success" className="agree-tag">all match</Tag>
             : groups.size > 0 ? <Tag minimal className="agree-tag">{groups.size} shared</Tag> : null}
         </th>
-        {reportNos.map((r) => {
+        {reportNos.map((r, i) => {
           const a = agreement.get(r);
+          const d = loaded[i];
+          const value = d ? REPORTED_VALUE[field](d) : a?.label;
           return (
             <td key={r} className={a?.group !== null && a?.group !== undefined ? `agree agree-${a.group}` : "differ"}>
-              {a ? a.label : <span className="empty-value">—</span>}
+              {value ?? <span className="empty-value">not reported</span>}
             </td>
           );
         })}
