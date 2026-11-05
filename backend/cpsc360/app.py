@@ -204,6 +204,8 @@ def delete_relation(report_a: str, report_b: str, actor: Writer):
     a,b = sorted([report_a,report_b])
     with connection() as conn:
         before = conn.execute('DELETE FROM workspace.relation_review WHERE report_a=%s AND report_b=%s RETURNING *', (a,b)).fetchone()
+        if before is None:
+            raise HTTPException(404, f'No relationship review for {a}/{b}')
         w.audit(conn, actor, 'relation.delete', 'relation', a+'/'+b, before)
     return Response(status_code=204)
 

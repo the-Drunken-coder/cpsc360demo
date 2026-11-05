@@ -28,7 +28,7 @@ Analytics count reports by submission date. They are not incident rates: there i
 
 ## Run it
 
-You need Python 3.12, Node 20 or newer, and Docker.
+You need Python 3.12, Node 20.19+ or 22.12+ (Vite 7), and Docker.
 
 ```sh
 scripts/dev-db.sh                                   # Postgres 16 on 127.0.0.1:5433

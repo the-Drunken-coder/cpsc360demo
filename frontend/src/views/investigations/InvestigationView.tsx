@@ -57,6 +57,7 @@ export function InvestigationView() {
   const inv = useQuery({ queryKey: qk.investigation(id), queryFn: () => api.investigation(id), enabled: Number.isInteger(id) });
   const { patch } = useInvestigationMutations(id);
 
+  if (!Number.isInteger(id)) return <NonIdealState icon="search" title={`No investigation "${params.id}"`} />;
   if (inv.isPending) return <NonIdealState icon={<Spinner />} title={`Loading investigation #${params.id}`} />;
   if (inv.isError) return <NonIdealState icon="error" title={`Investigation #${params.id}`} description={inv.error.message} />;
   const i = inv.data;

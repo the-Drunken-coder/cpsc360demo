@@ -30,8 +30,15 @@ export function useRegisteredHotkeys(handlers: HotkeyHandlers) {
       .map((id) => ({
         ...HOTKEYS[id],
         global: true,
-        preventDefault: true,
-        onKeyDown: () => ref.current[id]?.(),
+        preventDefault: id !== "open",
+        onKeyDown: (event: KeyboardEvent) => {
+          // Enter on a link, button, or select must keep its native action.
+          if (id === "open") {
+            if ((event.target as HTMLElement | null)?.closest("a, button, select, [role=button]")) return;
+            event.preventDefault();
+          }
+          ref.current[id]?.();
+        },
       })),
     [ids],
   );

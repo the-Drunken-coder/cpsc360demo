@@ -12,9 +12,10 @@ import { useInvestigationMutations } from "./InvestigationView";
 export function MembersPanel({ investigation }: { investigation: Investigation }) {
   const { canWrite } = useSession();
   const { removeMember } = useInvestigationMutations(investigation.id);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [picked, setSelected] = useState<string[]>([]);
   const members = investigation.incidents;
   const all = members.map((m) => m.incident.report_no);
+  const selected = picked.filter((r) => all.includes(r));
   const toggle = (r: string) => setSelected((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
   if (members.length === 0) {

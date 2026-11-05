@@ -139,21 +139,29 @@ class TextIndex:
             self.terms = vectorizer.get_feature_names_out()
             self.batch = batch
 
+    def position(self, report):
+        # A sync run from the CLI adds reports without telling a running API; reload once before giving up.
+        if report not in self.positions:
+            self.load()
+        if report not in self.positions:
+            raise HTTPException(409, f'{report} is not in the text index yet; rebuild inference and restart the API.')
+        return self.positions[report]
+
     def neighbors(self, report):
         with self.lock:
-            scores = (self.matrix @ self.matrix[self.positions[report]].T).toarray().ravel()
+            scores = (self.matrix @ self.matrix[self.position(report)].T).toarray().ravel()
             indices = np.argsort(-scores)[:301]
             return {self.ids[i]: float(scores[i]) for i in indices if self.ids[i] != report}
 
     def pair(self, a, b):
         with self.lock:
-            product = self.matrix[self.positions[a]].multiply(self.matrix[self.positions[b]])
+            product = self.matrix[self.position(a)].multiply(self.matrix[self.position(b)])
             order = np.argsort(-product.data)[:8]
             return float(product.sum()), [str(self.terms[product.indices[i]]) for i in order]
 
     def shared(self, ids):
         with self.lock:
-            subset = self.matrix[[self.positions[r] for r in ids]]
+            subset = self.matrix[[self.position(r) for r in ids]]
             count = np.asarray((subset > 0).sum(axis=0)).ravel()
             weight = np.asarray(subset.sum(axis=0)).ravel()
             candidates = np.flatnonzero(count >= 2)

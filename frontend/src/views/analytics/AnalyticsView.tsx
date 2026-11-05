@@ -69,7 +69,7 @@ export function AnalyticsView() {
   const openTrendPoint = (seriesIndex: number, period: string) => {
     const t = trend.data;
     const s = t?.series[seriesIndex];
-    if (!t || !s || !isDrillable(s.key)) return;
+    if (!t || !s || trend.isPlaceholderData || !isDrillable(s.key)) return;
     const range = clampRange(periodRange(period, t.interval), { from: filters.report_date_from, to: filters.report_date_to });
     let next: Filters = { ...filters, report_date_from: range.from, report_date_to: range.to };
     if (view.group_by !== "none") next = withGroup(next, view.group_by, s.key);
@@ -137,7 +137,7 @@ export function AnalyticsView() {
                 {breakdown.data.rows.map((r) => (
                   <tr key={r.key} className={isDrillable(r.key) ? undefined : "not-drillable"}
                     title={isDrillable(r.key) ? undefined : "Reports with no value here cannot be filtered on"}
-                    onClick={() => isDrillable(r.key) && navigate(explorerHref(withGroup(filters, breakdown.data.dimension, r.key)))}>
+                    onClick={() => isDrillable(r.key) && !breakdown.isPlaceholderData && navigate(explorerHref(withGroup(filters, breakdown.data.dimension, r.key)))}>
                     <td className="cell-clip" title={r.label}>{r.label}</td>
                     <td className="num">{fmtCount(r.count)}</td>
                     <td className="bar-cell"><div className="inline-bar" style={{ width: `${(r.count / maxCount) * 100}%` }} /></td>

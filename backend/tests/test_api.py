@@ -276,3 +276,22 @@ def test_brand_and_model_filters_fold_accents(client, headers):
     assert get(client, headers, '/api/incidents', params={'brand': 'BabyBjorn'})['total'] == bjorn
     assert get(client, headers, '/api/incidents', params={'brand': 'BABYBJÖRN'})['total'] == bjorn
     assert get(client, headers, '/api/incidents', params={'model': 'Pelotn Tread'})['total'] == 0
+
+
+def test_deleting_a_missing_relation_review_is_404_and_not_audited(client, headers):
+    with connection() as conn:
+        before = conn.execute("SELECT count(*) n FROM workspace.audit_log WHERE action = 'relation.delete'").fetchone()['n']
+    response = client.delete('/api/relations/20110101-AAAAA-1/20110101-BBBBB-2', headers=headers['jrivera'])
+    assert response.status_code == 404
+    with connection() as conn:
+        assert conn.execute("SELECT count(*) n FROM workspace.audit_log WHERE action = 'relation.delete'").fetchone()['n'] == before
+
+
+def test_a_report_missing_from_the_text_index_is_a_clear_409(client, headers):
+    report = get(client, headers, '/api/incidents?page_size=1')['items'][0]['report_no']
+    position = index.positions.pop(report)
+    try:
+        response = client.get(f'/api/incidents/{report}/related', headers=headers['jrivera'])
+        assert response.status_code == 409 and 'text index' in response.json()['detail']
+    finally:
+        index.positions[report] = position

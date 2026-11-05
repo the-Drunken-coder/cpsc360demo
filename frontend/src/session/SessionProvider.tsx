@@ -1,4 +1,4 @@
-import { NonIdealState, Spinner } from "@blueprintjs/core";
+import { Button, NonIdealState, Spinner } from "@blueprintjs/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, onUnauthorized, setToken } from "../api/client";
@@ -53,10 +53,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return session;
   }, []);
 
-  useEffect(() => {
+  const start = useCallback(() => {
+    setError(null);
     login(storedHandle())
       .catch(() => login(DEFAULT_HANDLE))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  }, [login]);
+
+  useEffect(() => {
+    start();
     onUnauthorized(async () => {
       try {
         return (await login(storedHandle())).token;
@@ -64,7 +69,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return null;
       }
     });
-  }, [login]);
+  }, [login, start]);
 
   const switchUser = useCallback(async (handle: string) => {
     await login(handle);
@@ -80,7 +85,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [user, users.data, switchUser]);
 
   if (error) {
-    return <NonIdealState icon="offline" title="API unavailable" description={`Could not start a session: ${error}`} />;
+    return <NonIdealState icon="offline" title="API unavailable" description={`Could not start a session: ${error}`}
+      action={<Button icon="refresh" text="Retry" onClick={start} />} />;
   }
   if (!value) return <NonIdealState icon={<Spinner />} title="Starting session" />;
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

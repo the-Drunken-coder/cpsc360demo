@@ -28,7 +28,7 @@ export function NotesPanel({ investigation }: { investigation: Investigation }) 
         <div className="note-composer">
           <TextArea fill value={body} placeholder="Note. Report numbers such as 20240101-ABCDE-1 become links."
             onChange={(e) => setBody(e.currentTarget.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && body.trim()) add.mutate(); }} />
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && body.trim() && !add.isPending) add.mutate(); }} />
           <div className="note-composer-actions">
             <span className={Classes.TEXT_MUTED}>Ctrl+Enter to post</span>
             <Button small intent="primary" text="Add note" disabled={!body.trim()} loading={add.isPending} onClick={() => add.mutate()} />
