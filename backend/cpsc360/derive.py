@@ -1,9 +1,10 @@
 """Automated derivations over source records. Pure functions; ingest.derive writes their output to `inference`."""
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
-NORM_METHOD = "keys-v4"
+NORM_METHOD = "keys-v5"
 HAZARD_METHOD = "hazard-rules-v2"
 
 _PLACEHOLDERS = {
@@ -16,8 +17,8 @@ _PLACEHOLDERS = {
 # Non-answers ("None found", "unknown at this time", "IMEI [REDACTED]") take endless spellings, so a model
 # with no digits that contains one of these words is treated as a placeholder rather than listed one by one.
 _NON_ANSWER = re.compile(
-    r"\b(?:unknown|unk|none|n/?a|redacted|unavailable|idk|no idea|not (?:sure|known|available|provided|listed|"
-    r"applicable|shown|found|visible)|(?:don'?t|do not|dont) know|see (?:above|below|photos?|pictures?|attached|description))\b",
+    r"(?<![\w-])(?:unknown|unk|none|n/?a|redacted|unavailable|idk|no idea|not (?:sure|known|available|provided|listed|"
+    r"applicable|shown|found|visible)|(?:don'?t|do not|dont) know|see (?:above|below|photos?|pictures?|attached|description))(?![\w-])",
     re.IGNORECASE,
 )
 
@@ -32,13 +33,25 @@ def match_text(value: str | None) -> str:
     return _alnum(value or "")
 
 
+def _fold(value: str) -> str:
+    """'Pelotón' and 'BABYBJÖRN' compare as 'Peloton' and 'BABYBJORN'."""
+    return "".join(c for c in unicodedata.normalize("NFKD", value) if not unicodedata.combining(c))
+
+
 def _alnum(value: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", value.lower())
+    return re.sub(r"[^a-z0-9]", "", _fold(value).lower())
+
+
+def product_model_key(model: str | None, brand: str | None, manufacturer: str) -> str | None:
+    """A model that only repeats the brand or maker ("Kenmore", "Samsung") names no product."""
+    key = model_key(model)
+    maker_words = {_alnum(w) for w in manufacturer_key(manufacturer).split()} | {_alnum(manufacturer_key(manufacturer))}
+    return None if key is None or key == brand_key(brand) or key in maker_words else key
 
 
 def manufacturer_key(name: str) -> str:
     """'SAMSUNG ELECTRONICS AMERICA, INC. (SEA)' and 'Samsung Electronics' -> 'samsung electronics'."""
-    text = re.sub(r"\([^)]*\)", " ", name.lower())
+    text = re.sub(r"\([^)]*\)", " ", _fold(name).lower())
     words = [w for w in re.split(r"[^a-z0-9&]+", text) if w and w not in _MFR_SUFFIXES]
     return " ".join(words) or name.strip().lower()
 

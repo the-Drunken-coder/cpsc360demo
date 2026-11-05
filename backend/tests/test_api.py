@@ -1,5 +1,6 @@
 import csv
 import html
+import unicodedata
 import io
 import math
 
@@ -264,3 +265,14 @@ def test_manufacturer_claims_quote_reported_spellings(client, headers, workspace
     snapshot = client.post(f"/api/investigations/{inv['id']}/summary", headers=headers['jrivera']).json()
     claim = next(c for s in snapshot['sections'] for c in s['claims'] if 'match on manufacturer' in c['text'])
     assert all(f'"{s}"' in claim['text'] for s in spellings)
+
+
+def test_brand_and_model_filters_fold_accents(client, headers):
+    with connection() as conn:
+        brands = [r['brand'] for r in conn.execute("SELECT brand FROM source.incident WHERE brand ~* 'bj'")]
+    fold = lambda b: ''.join(c for c in unicodedata.normalize('NFKD', b.lower()) if c.isascii() and c.isalnum())
+    bjorn = sum(fold(b) == 'babybjorn' for b in brands)
+    assert bjorn >= 8
+    assert get(client, headers, '/api/incidents', params={'brand': 'BabyBjorn'})['total'] == bjorn
+    assert get(client, headers, '/api/incidents', params={'brand': 'BABYBJÖRN'})['total'] == bjorn
+    assert get(client, headers, '/api/incidents', params={'model': 'Pelotn Tread'})['total'] == 0

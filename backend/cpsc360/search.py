@@ -52,7 +52,7 @@ def filters_sql(filters: Filters, omit: str | None = None):
         if value is None:
             continue
         if derive.match_text(value):
-            clauses.append(f"regexp_replace(lower(coalesce(i.{field}, '')), '[^a-z0-9]', '', 'g') = %s")
+            clauses.append(f"n.{field}_text = %s")
             args.append(derive.match_text(value))
         else:
             clauses.append(f"lower(btrim(i.{field})) = %s")

@@ -123,6 +123,11 @@ CREATE TABLE IF NOT EXISTS inference.incident_norm (
     model_key         text,
     method            text NOT NULL
 );
+-- Folded letters and digits of the reported brand and model, which the explorer's brand and model filters compare.
+ALTER TABLE inference.incident_norm ADD COLUMN IF NOT EXISTS brand_text text;
+ALTER TABLE inference.incident_norm ADD COLUMN IF NOT EXISTS model_text text;
+CREATE INDEX IF NOT EXISTS incident_norm_brand_text_idx ON inference.incident_norm (brand_text);
+CREATE INDEX IF NOT EXISTS incident_norm_model_text_idx ON inference.incident_norm (model_text);
 CREATE INDEX IF NOT EXISTS incident_norm_mfr_idx ON inference.incident_norm (manufacturer_key);
 CREATE INDEX IF NOT EXISTS incident_norm_brand_idx ON inference.incident_norm (brand_key);
 CREATE INDEX IF NOT EXISTS incident_norm_model_idx ON inference.incident_norm (model_key);

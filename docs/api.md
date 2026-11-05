@@ -71,7 +71,7 @@ interface Filters {
   product_category?: string[];
   product_code?: string[];
   manufacturer_key?: string[];
-  brand?: string;                  // reported brand equals this, comparing letters and digits only, case-insensitive
+  brand?: string;                  // reported brand equals this, comparing letters and digits only, case- and accent-insensitive
   model?: string;                  // same rule for the reported model; a value with no letters or digits matches exactly
   hazard?: HazardKey[];
   hazard_all?: HazardKey[];        // every listed hazard must be present (AND), on top of `hazard`

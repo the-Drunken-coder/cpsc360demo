@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 
-from cpsc360.derive import manufacturer_key, model_key, tag_hazards
+from cpsc360.derive import manufacturer_key, model_key, product_model_key, tag_hazards
 from cpsc360.source_csv import parse_export
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -53,6 +53,14 @@ def test_placeholder_models_never_match():
     assert model_key("IMEI [REDACTED]") is None
     assert model_key("Polaris RZR 800 [REDACTED]") == "polarisrzr800redacted"
     assert model_key("HP OmniStudio All-in-One X27") == "hpomnistudioallinonex27"
+    assert model_key("AW-R-NA-BLUE") == "awrnablue"
+    assert model_key("Pelotón Tread +") == model_key("Peloton Tread+")
+
+
+def test_a_model_that_repeats_the_brand_or_maker_names_no_product():
+    assert product_model_key("Kenmore", "Kenmore", "Sears Holdings Management Corporation") is None
+    assert product_model_key("Samsung", "Samsung", "SAMSUNG ELECTRONICS AMERICA, INC.") is None
+    assert product_model_key("WRF555", "Whirlpool", "WHIRLPOOL CORPORATION") == "wrf555"
 
 
 def test_hazard_tags_keep_the_matched_phrases():

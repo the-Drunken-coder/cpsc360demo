@@ -152,11 +152,18 @@ def rebuild_inference() -> dict:
         for report_no, manufacturer, brand, model, narrative in records:
             key = derive.manufacturer_key(manufacturer)
             spellings[key][manufacturer.strip()] += 1
-            norm.append((report_no, key, derive.brand_key(brand), derive.model_key(model), derive.NORM_METHOD))
+            norm.append((
+                report_no, key, derive.brand_key(brand), derive.product_model_key(model, brand, manufacturer),
+                derive.match_text(brand) or None, derive.match_text(model) or None, derive.NORM_METHOD,
+            ))
             for hazard, evidence in derive.tag_hazards(narrative).items():
                 hazards.append((report_no, hazard, evidence, derive.HAZARD_METHOD))
         cur.execute("TRUNCATE inference.incident_norm, inference.incident_hazard, inference.manufacturer")
-        cur.executemany("INSERT INTO inference.incident_norm VALUES (%s, %s, %s, %s, %s)", norm)
+        cur.executemany(
+            "INSERT INTO inference.incident_norm (report_no, manufacturer_key, brand_key, model_key, brand_text, model_text, method) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            norm,
+        )
         cur.executemany("INSERT INTO inference.incident_hazard VALUES (%s, %s, %s, %s)", hazards)
         cur.executemany(
             "INSERT INTO inference.manufacturer VALUES (%s, %s, %s, %s, %s)",
