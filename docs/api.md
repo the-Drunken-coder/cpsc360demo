@@ -246,7 +246,7 @@ interface AuditEntry { id: number; at: string; actor: User; action: string; enti
 interface SummaryClaim { text: string; citations: string[] }   // every citation is a member report_no
 interface SummarySnapshot {
   id: number; investigation_id: number; generated_at: string; generated_by: User;
-  method: string;                 // "summary-template-v1": deterministic, built from PatternAnalysis and member data
+  method: string;                 // "summary-template-v2": deterministic, built from PatternAnalysis and member data
   label: string;                  // "Automated summary. Built only from the reports cited. Not an official CPSC finding."
   sections: {heading: string; claims: SummaryClaim[]}[];
   member_report_nos: string[];    // membership when generated

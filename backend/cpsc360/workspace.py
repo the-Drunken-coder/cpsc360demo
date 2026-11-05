@@ -86,6 +86,25 @@ HEADINGS = ['Scope', 'Severity', 'Hazard pattern', 'Product concentration', 'Nar
 SUMMARY_LABEL = 'Automated summary. Built only from the reports cited. Not an official CPSC finding.'
 
 
+def count(n, noun='report'):
+    return f'{n} {noun}' if n == 1 else f'{n} {noun}s'
+
+
+def theme_terms(shared_terms, already_named, limit=6):
+    """Distinct terms only: skip a term whose words are all in a stronger term or in a product name already claimed."""
+    covered = {word for name in already_named for word in name.lower().split()}
+    chosen = []
+    for term in shared_terms:
+        words = set(term.term.split())
+        if words <= covered:
+            continue
+        chosen.append(term)
+        covered |= words
+        if len(chosen) == limit:
+            break
+    return chosen
+
+
 def generate_summary(conn, id, actor):
     inv = investigation(conn, id, actor)
     ids = [member.incident.report_no for member in inv.incidents]
@@ -97,26 +116,31 @@ def generate_summary(conn, id, actor):
             sections[heading].append({'text': text, 'citations': citations})
     if analysis:
         rows = reports(conn, ids)
-        claim('Scope', f'{len(ids)} public reports, submitted {analysis.date_range.first} through {analysis.date_range.last}.', ids)
+        claim('Scope', f'{count(len(ids), "public report")}, submitted {analysis.date_range.first} through {analysis.date_range.last}.', ids)
         for group in next(a.values for a in analysis.field_agreement if a.field == 'product_category'):
-            claim('Scope', f'{len(group.report_nos)} reports describe products in {group.label}.', group.report_nos)
-        claim('Severity', f'{analysis.injury_count} reports describe injury; {analysis.death_count} report death.', ids)
+            claim('Scope', f'{count(len(group.report_nos))} in category {group.label}.', group.report_nos)
+        injuries = [r['report_no'] for r in rows if r['is_injury'] and r['severity'] != 'Death']
+        deaths = [r['report_no'] for r in rows if r['severity'] == 'Death']
+        claim('Severity', f'{count(len(injuries))} describe an injury.', injuries)
+        claim('Severity', f'{count(len(deaths))} describe a death.', deaths)
         for hazard in analysis.hazards[:5]:
             evidence = conn.execute('SELECT DISTINCT unnest(evidence) phrase FROM inference.incident_hazard WHERE hazard=%s AND report_no=ANY(%s) LIMIT 8', (hazard.hazard, hazard.report_nos)).fetchall()
-            claim('Hazard pattern', f'{hazard.label} inferred in {len(hazard.report_nos)} reports. Matched phrases: ' + ', '.join(r['phrase'] for r in evidence) + '.', hazard.report_nos)
+            claim('Hazard pattern', f'{hazard.label} inferred in {count(len(hazard.report_nos))}. Matched phrases: ' + ', '.join(r['phrase'] for r in evidence) + '.', hazard.report_nos)
+        named = []
         for field in analysis.field_agreement:
             if field.field in ['model_key', 'brand_key', 'manufacturer_key']:
                 for group in field.values:
                     if group.value and len(group.report_nos) >= 2:
-                        claim('Product concentration', f'{len(group.report_nos)} reports share {KEY_LABELS[field.field][0]}: {group.label}.', group.report_nos)
-        for term in analysis.shared_terms:
-            claim('Narrative themes', f'Shared distinctive term "{term.term}" in {len(term.report_nos)} reports.', term.report_nos)
+                        named.append(group.label)
+                        claim('Product concentration', f'{count(len(group.report_nos))} share {KEY_LABELS[field.field][0]} {group.label.rstrip(".")}.', group.report_nos)
+        for term in theme_terms(analysis.shared_terms, named):
+            claim('Narrative themes', f'"{term.term}" appears in {count(len(term.report_nos))}.', term.report_nos)
         responses = [r['report_no'] for r in rows if r['has_company_comment']]
-        claim('Manufacturer responses', f'{len(responses)} reports have a published company response.', responses)
+        claim('Manufacturer responses', f'{count(len(responses))} carry a published company response.', responses)
         for n in inv.notes[:5]:
             claim('Analyst notes', f'{n.author.display_name}: {n.body}', n.cited_report_nos)
     body = {'label': SUMMARY_LABEL, 'sections': [{'heading': h, 'claims': claims} for h, claims in sections.items()], 'member_report_nos': ids}
-    row = conn.execute('INSERT INTO workspace.summary_snapshot (investigation_id,method,body,generated_by) VALUES (%s,%s,%s,%s) RETURNING *', (id, 'summary-template-v1', Jsonb(body), actor.id)).fetchone()
+    row = conn.execute('INSERT INTO workspace.summary_snapshot (investigation_id,method,body,generated_by) VALUES (%s,%s,%s,%s) RETURNING *', (id, 'summary-template-v2', Jsonb(body), actor.id)).fetchone()
     audit(conn, actor, 'summary.generate', 'investigation', id, after={**body, 'snapshot_id': row['id']})
     return snapshot(conn, row)
 

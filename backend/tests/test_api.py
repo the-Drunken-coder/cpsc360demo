@@ -173,3 +173,16 @@ def test_spikes_hand_checked(client, headers):
     assert row['expected_count'] == pytest.approx(expected)
     assert row['z'] == pytest.approx((recent-expected)/math.sqrt(max(expected,1)))
     assert get(client,headers,'/api/incidents',params=[('product_code',row['key']),('report_date_from',result['window']['start']),('report_date_to',result['window']['end'])])['total'] == recent
+
+
+def test_summary_claims_cite_only_the_reports_they_count(client, headers, workspace_cleanup):
+    injured = get(client, headers, '/api/incidents?injury_only=true&page_size=2')['items']
+    uninjured = get(client, headers, '/api/incidents?injury_only=false&page_size=1')['items']
+    ids = [r['report_no'] for r in injured + uninjured]
+    inv = client.post('/api/investigations', headers=headers['jrivera'], json={'title': '[test] citations', 'report_nos': ids}).json()
+    snapshot = client.post(f"/api/investigations/{inv['id']}/summary", headers=headers['jrivera']).json()
+    severity = next(s['claims'] for s in snapshot['sections'] if s['heading'] == 'Severity')
+    injury_claim = next(c for c in severity if 'injury' in c['text'])
+    assert injury_claim['text'] == '2 reports describe an injury.'
+    assert set(injury_claim['citations']) == {r['report_no'] for r in injured if r['severity'] != 'Death'}
+    assert all('..' not in c['text'] and ' 1 reports' not in c['text'] for s in snapshot['sections'] for c in s['claims'])

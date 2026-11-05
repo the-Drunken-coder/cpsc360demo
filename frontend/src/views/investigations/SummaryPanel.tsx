@@ -58,7 +58,7 @@ export function SummaryPanel({ investigation }: { investigation: Investigation }
                 Membership changed since this snapshot. Generate again to include the current {members.length} reports.
               </Callout>
             )}
-            {snapshot.sections.map((section) => (
+            {snapshot.sections.filter((section) => section.claims.length > 0).map((section) => (
               <section key={section.heading} className="summary-section">
                 <h3>{section.heading}</h3>
                 <ul>
