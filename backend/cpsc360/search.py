@@ -73,15 +73,17 @@ def summaries(conn, filters: Filters, sort=None, limit=50, offset=0):
     else:
         sorting = order.get(sort, order['report_date'])
     rows = conn.execute('SELECT ' + FIELDS + JOIN + where + f' ORDER BY {sorting},i.report_no LIMIT %s OFFSET %s', [*args, limit, offset]).fetchall()
-    return total, [summary(conn, row, filters.q) for row in rows]
+    if filters.q and rows:
+        excerpts = conn.execute("SELECT report_no, ts_headline('english', narrative, websearch_to_tsquery('english',%s), 'StartSel=, StopSel=, MaxWords=40, MinWords=20') snippet FROM unnest(%s::text[],%s::text[]) AS t(report_no,narrative)", (filters.q, [r['report_no'] for r in rows], [r['incident_description'] for r in rows])).fetchall()
+        marked = conn.execute("SELECT report_no, ts_headline('english', narrative, websearch_to_tsquery('english',%s), 'StartSel=<mark>, StopSel=</mark>, HighlightAll=true') snippet FROM unnest(%s::text[],%s::text[]) AS t(report_no,narrative)", (filters.q, [r['report_no'] for r in excerpts], [html.escape(r['snippet']) for r in excerpts])).fetchall()
+        snippets = {r['report_no']: r['snippet'] for r in marked}
+        for row in rows:
+            row['_snippet'] = snippets[row['report_no']]
+    return total, [summary(conn, row) for row in rows]
 
 
-def summary(conn, row, q=None):
-    if q:
-        snippet = conn.execute("SELECT ts_headline('english', %s, websearch_to_tsquery('english',%s), 'StartSel=, StopSel=, MaxWords=40, MinWords=20') text", (row['incident_description'], q)).fetchone()['text']
-        snippet = conn.execute("SELECT ts_headline('english', %s, websearch_to_tsquery('english',%s), 'StartSel=<mark>, StopSel=</mark>, HighlightAll=true') text", (html.escape(snippet), q)).fetchone()['text']
-    else:
-        snippet = html.escape(row['incident_description'][:240])
+def summary(conn, row):
+    snippet = row.get('_snippet', html.escape(row['incident_description'][:240]))
     return IncidentSummary.model_validate({**row, 'snippet': snippet})
 
 

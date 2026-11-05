@@ -22,4 +22,4 @@ build-backend = "setuptools.build_meta"
 packages = ["cpsc360"]
 
 [tool.setuptools.package-data]
-cpsc360 = ["schema.sql"]
+cpsc360 = ["schema.sql", "disclaimer.txt"]
