@@ -127,12 +127,16 @@ def generate_summary(conn, id, actor):
             evidence = conn.execute('SELECT DISTINCT unnest(evidence) phrase FROM inference.incident_hazard WHERE hazard=%s AND report_no=ANY(%s) LIMIT 8', (hazard.hazard, hazard.report_nos)).fetchall()
             claim('Hazard pattern', f'{hazard.label} inferred in {count(len(hazard.report_nos))}. Matched phrases: ' + ', '.join(r['phrase'] for r in evidence) + '.', hazard.report_nos)
         named = []
+        by_report = {r['report_no']: r for r in rows}
         for field in analysis.field_agreement:
             if field.field in ['model_key', 'brand_key', 'manufacturer_key']:
+                noun, label_field = KEY_LABELS[field.field]
                 for group in field.values:
                     if group.value and len(group.report_nos) >= 2:
-                        named.append(group.label)
-                        claim('Product concentration', f'{count(len(group.report_nos))} share {KEY_LABELS[field.field][0]} {group.label.rstrip(".")}.', group.report_nos)
+                        spellings = sorted({(by_report[r][label_field] or '').strip() for r in group.report_nos} - {''}, key=str.lower)
+                        named.extend(spellings)
+                        shown = ', '.join(f'"{s}"' for s in spellings[:4]) + (f' and {len(spellings) - 4} more' if len(spellings) > 4 else '')
+                        claim('Product concentration', f'{count(len(group.report_nos))} match on {noun}, reported as {shown}.', group.report_nos)
         for term in theme_terms(analysis.shared_terms, named):
             claim('Narrative themes', f'"{term.term}" appears in {count(len(term.report_nos))}.', term.report_nos)
         responses = [r['report_no'] for r in rows if r['has_company_comment']]

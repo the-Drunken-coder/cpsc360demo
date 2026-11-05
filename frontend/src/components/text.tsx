@@ -37,11 +37,15 @@ export function Linkified({ body }: { body: string }) {
   );
 }
 
+export function termPattern(terms: string[]): RegExp {
+  const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
+}
+
 export function Highlighted({ text, terms }: { text: string; terms: string[] }) {
   const usable = terms.map((t) => t.trim()).filter((t) => t.length >= 3);
   if (usable.length === 0) return <>{text}</>;
-  const escaped = usable.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const re = new RegExp(`\\b(${escaped.join("|")})\\w*`, "gi");
+  const re = termPattern(usable);
   const out: JSX.Element[] = [];
   let last = 0;
   for (const m of text.matchAll(re)) {

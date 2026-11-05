@@ -46,8 +46,13 @@ def trend(conn, filters, interval, group_by, top):
     selected = sorted(totals, key=lambda k: (-totals[k], k))[:top]
     series = defaultdict(lambda: defaultdict(int))
     for r in rows:
-        key = r['key'] if r['key'] in selected else '__other__'
-        series[key][r['period']] += r['count']
+        if r['key'] in selected:
+            series[r['key']][r['period']] += r['count']
+    if len(totals) > len(selected):
+        # Count reports, not group rows: a report can carry several hazards outside the top series.
+        other = conn.execute(f"SELECT date_trunc(%s,i.report_date)::date period,count(DISTINCT i.report_no) count" + JOIN + extra + where + f" AND coalesce({field},'__unknown__') <> ALL(%s) GROUP BY 1", [interval, *args, selected]).fetchall()
+        for r in other:
+            series['__other__'][r['period']] = r['count']
     periods = sorted(set(r['period'] for r in rows))
     if periods:
         end = periods[-1]
@@ -58,7 +63,8 @@ def trend(conn, filters, interval, group_by, top):
             periods.append(period)
             year, month = year + (month - 1 + step) // 12, (month - 1 + step) % 12 + 1
     newest = conn.execute('SELECT max(report_date) newest FROM source.incident').fetchone()['newest']
-    return m.Trend(caveat=CAVEAT, interval=interval, incomplete_after=newest-timedelta(days=30), series=[{'key': k, 'label': 'Other' if k == '__other__' else 'All reports' if k == 'all' else label(conn, group_by, k), 'points': [{'period': p, 'count': series[k][p]} for p in periods], 'total': sum(series[k].values())} for k in [*selected, '__other__'] if k in series])
+    caveat = CAVEAT + (' A report with several inferred hazards appears in each of their series.' if group_by == 'hazard' else '')
+    return m.Trend(caveat=caveat, interval=interval, incomplete_after=newest-timedelta(days=30), series=[{'key': k, 'label': 'Other' if k == '__other__' else 'All reports' if k == 'all' else label(conn, group_by, k), 'points': [{'period': p, 'count': series[k][p]} for p in periods], 'total': sum(series[k].values())} for k in [*selected, '__other__'] if k in series])
 
 
 def spike_values(recent, baseline, window_days):

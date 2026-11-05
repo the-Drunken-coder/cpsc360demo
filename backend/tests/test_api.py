@@ -228,3 +228,25 @@ def test_removing_a_non_member_is_404_and_not_audited(client, headers, workspace
 def test_company_responses_split_only_at_line_starts(client, headers):
     detail = get(client, headers, '/api/incidents/20220306-541AF-2147357338')
     assert [c['company'] for c in detail['company_comments']] == ['Bestway Inflatables & Material Corp.']
+
+
+def test_trend_other_counts_reports_not_hazard_tags(client, headers):
+    trend = get(client, headers, '/api/analytics/trend?interval=quarter&group_by=hazard&top=6')
+    top = [s['key'] for s in trend['series'] if s['key'] != '__other__']
+    other = next(s for s in trend['series'] if s['key'] == '__other__')
+    point = next(p for p in other['points'] if p['period'] == '2024-01-01')
+    with connection() as conn:
+        reports = conn.execute("SELECT count(DISTINCT h.report_no) n FROM inference.incident_hazard h JOIN source.incident i USING (report_no) WHERE i.report_date >= '2024-01-01' AND i.report_date < '2024-04-01' AND h.hazard <> ALL(%s)", (top,)).fetchone()['n']
+    assert point['count'] == reports
+    assert 'several inferred hazards' in trend['caveat']
+
+
+def test_concentration_claims_quote_every_cited_spelling(client, headers, workspace_cleanup):
+    with connection() as conn:
+        rows = conn.execute("SELECT i.report_no, i.model FROM source.incident i JOIN inference.incident_norm n USING (report_no) WHERE n.model_key = 'shapeups' ORDER BY i.model LIMIT 12").fetchall()
+    spellings = {r['model'].strip() for r in rows}
+    assert len(spellings) >= 2
+    inv = client.post('/api/investigations', headers=headers['jrivera'], json={'title': '[test] spellings', 'report_nos': [r['report_no'] for r in rows]}).json()
+    snapshot = client.post(f"/api/investigations/{inv['id']}/summary", headers=headers['jrivera']).json()
+    claim = next(c for s in snapshot['sections'] for c in s['claims'] if 'match on model' in c['text'])
+    assert all(f'"{s}"' in claim['text'] for s in spellings)
