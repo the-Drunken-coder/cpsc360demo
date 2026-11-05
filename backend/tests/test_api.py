@@ -347,3 +347,15 @@ def test_queries_pick_up_a_newer_ingest_batch(client, headers):
         assert index.batch == saved[2]
     finally:
         index.matrix, index.positions, index.batch = saved
+
+
+def test_relation_reasons_use_the_newest_ingest_batch(client, headers, workspace_cleanup):
+    a, b = [i['report_no'] for i in get(client, headers, '/api/incidents?page_size=2')['items']]
+    saved = index.matrix, index.positions, index.batch
+    index.batch = -1
+    try:
+        response = client.put('/api/relations', headers=headers['jrivera'], json={'report_a': a, 'report_b': b, 'verdict': 'rejected', 'note': '[test] batch'})
+        assert response.status_code == 200
+        assert index.batch == saved[2]
+    finally:
+        index.matrix, index.positions, index.batch = saved

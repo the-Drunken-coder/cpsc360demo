@@ -192,6 +192,7 @@ def put_relation(body: m.RelationInput, actor: Writer):
         raise HTTPException(422, 'A relationship requires two distinct reports')
     with connection() as conn:
         rows = reports(conn, [a, b])
+        index.load()
         reasons = [r.model_dump(exclude_none=True) for r in pair_reasons(*rows)]
         before = conn.execute('SELECT * FROM workspace.relation_review WHERE report_a=%s AND report_b=%s', (a,b)).fetchone()
         row = conn.execute('INSERT INTO workspace.relation_review (report_a,report_b,verdict,note,reasons_snapshot,reviewer_id) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (report_a,report_b) DO UPDATE SET verdict=excluded.verdict,note=excluded.note,reasons_snapshot=excluded.reasons_snapshot,reviewer_id=excluded.reviewer_id,reviewed_at=now() RETURNING *', (a,b,body.verdict,body.note,Jsonb(reasons),actor.id)).fetchone()
