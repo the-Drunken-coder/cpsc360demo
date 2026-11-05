@@ -465,7 +465,7 @@ async def classify_hazards(body: m.AISelection, actor: Writer):
         async with semaphore:
             try:
                 raw = await opencode_go.chat_complete(setting['api_key'], setting['model'], ai_hazards.messages(row['incident_description']), f'cpsc360-hazards-{actor.id}')
-                hazards, dropped = ai_hazards.validate(raw, row['incident_description'])
+                hazards, dropped = ai_hazards.validate(raw.replace(setting['api_key'], '[redacted]'), row['incident_description'])
             except opencode_go.UpstreamError as exc:
                 error, upstream_status = str(exc).replace(setting['api_key'], '[redacted]'), exc.status
             except (ValueError, TypeError) as exc:

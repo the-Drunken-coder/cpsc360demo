@@ -138,3 +138,15 @@ def test_malformed_reply_is_stored_and_rerun_upserts(go_client):
     with connection() as conn:
         rows = conn.execute("SELECT * FROM inference.ai_hazard WHERE report_no=%s AND model='test-chat'", (ids[0],)).fetchall()
         assert len(rows) == 1 and rows[0]['raw_response'] == state['raw']
+
+
+
+def test_upstream_echo_cannot_expose_key_in_dropped_claim(go_client):
+    client, headers, ids, state = go_client
+    configure(client, headers)
+    state['raw'] = json.dumps({'hazards': [{'hazard': 'unknown', 'evidence': ['sk-private-test-key-ABCD']}]})
+    response = client.post('/api/ai/hazards', headers=headers['jrivera'], json={'report_nos': ids[:1]})
+    assert response.status_code == 200
+    assert 'sk-private-test-key-ABCD' not in response.text
+    response = client.get('/api/incidents/' + ids[0], headers=headers['viewer'])
+    assert 'sk-private-test-key-ABCD' not in response.text
