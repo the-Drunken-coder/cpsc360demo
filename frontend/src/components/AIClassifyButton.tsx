@@ -14,8 +14,9 @@ export function AIClassifyButton({ reportNos, bulk = false }: { reportNos: strin
     onSuccess: (results) => {
       const ok = results.filter((result) => result.status === "ok").length;
       toast({ intent: ok === results.length ? "success" : "warning", message: `AI hazards · ${ok} ok, ${results.length - ok} errors` });
-      void client.invalidateQueries({ queryKey: ["incident"] });
     },
+    // A 502 still stores the error rows, so refresh after failures too.
+    onSettled: () => client.invalidateQueries({ queryKey: ["incident"] }),
   });
   if (setting.isError) return <Callout intent="warning">{setting.error.message}</Callout>;
   if (setting.data && !setting.data.configured) return <Link to="/settings">Configure AI in Settings</Link>;
