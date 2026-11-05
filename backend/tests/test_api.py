@@ -336,3 +336,14 @@ def test_a_failed_sync_still_rebuilds_inference_and_the_index(client, headers, m
     response = client.post('/api/source/sync', headers=headers['mchen'])
     assert response.status_code == 502
     assert calls == ['rebuild', 'index']
+
+
+def test_queries_pick_up_a_newer_ingest_batch(client, headers):
+    report = get(client, headers, '/api/incidents?page_size=1')['items'][0]['report_no']
+    saved = index.matrix, index.positions, index.batch
+    index.batch = -1
+    try:
+        assert client.get(f'/api/incidents/{report}/related', headers=headers['jrivera']).status_code == 200
+        assert index.batch == saved[2]
+    finally:
+        index.matrix, index.positions, index.batch = saved

@@ -139,10 +139,11 @@ class TextIndex:
             self.terms = vectorizer.get_feature_names_out()
             self.batch = batch
 
-    def rows(self, reports):
-        # A sync run from the CLI adds reports without telling a running API, so reload once on a miss.
-        # Every row comes from the same index generation as the matrix the caller reads next.
-        if any(r not in self.positions for r in reports):
+    def rows(self, reports, refresh=False):
+        # A sync run from the CLI adds a batch without telling a running API. Entry points (neighbors, shared)
+        # check the batch once per request; per-pair lookups reload only on a miss, to avoid a query per pair.
+        # Every row comes from the generation the caller reads next.
+        if refresh or any(r not in self.positions for r in reports):
             self.load()
         missing = [r for r in reports if r not in self.positions]
         if missing:
@@ -151,7 +152,7 @@ class TextIndex:
 
     def neighbors(self, report):
         with self.lock:
-            (row,) = self.rows([report])
+            (row,) = self.rows([report], refresh=True)
             scores = (self.matrix @ self.matrix[row].T).toarray().ravel()
             indices = np.argsort(-scores)[:301]
             return {self.ids[i]: float(scores[i]) for i in indices if self.ids[i] != report}
@@ -165,7 +166,7 @@ class TextIndex:
 
     def shared(self, ids):
         with self.lock:
-            rows = self.rows(ids)
+            rows = self.rows(ids, refresh=True)
             subset = self.matrix[rows]
             count = np.asarray((subset > 0).sum(axis=0)).ravel()
             weight = np.asarray(subset.sum(axis=0)).ravel()
