@@ -87,6 +87,7 @@ export interface IncidentDetail {
   reported: ReportedIncident;
   company_comments: CompanyComment[];
   inferred: {
+    ai_hazards: AIHazardResult[];
     hazards: HazardTag[];
     manufacturer_key: string; manufacturer_display_name: string;
     brand_key: string | null; model_key: string | null; method: string;
@@ -217,3 +218,16 @@ export interface SourceStatus {
 }
 
 export interface Session { token: string; user: User }
+
+
+export interface GoSettings {
+  configured: boolean; key_hint: string | null; model: string;
+  updated_by: User | null; updated_at: string | null;
+}
+
+export interface AIHazardResult {
+  report_no: string; model: string; prompt_version: string; status: "ok" | "error";
+  hazards: { hazard: HazardKey; label: string; evidence: string[] }[];
+  dropped: { claim: unknown; reason: string }[];
+  error: string | null; classified_by: User | null; classified_at: string;
+}

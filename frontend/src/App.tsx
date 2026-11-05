@@ -1,3 +1,4 @@
+import { SettingsView } from "./views/settings/SettingsView";
 import { Alignment, Button, Classes, HotkeysProvider, Navbar, NavbarDivider, NavbarGroup, NavbarHeading, Tag } from "@blueprintjs/core";
 import { useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
@@ -39,6 +40,7 @@ export function App() {
 }
 
 const NAV = [
+  { to: "/settings", label: "Settings", icon: "cog", end: false },
   { to: "/", label: "Explorer", icon: "search-template", end: true },
   { to: "/analytics", label: "Analytics", icon: "timeline-bar-chart", end: false },
   { to: "/investigations", label: "Investigations", icon: "folder-shared", end: false },
@@ -75,6 +77,7 @@ function Shell() {
       </Navbar>
       <main className="main">
         <Routes>
+          <Route path="/settings" element={<SettingsView />} />
           <Route path="/" element={<ExplorerView />} />
           <Route path="/incidents/:reportNo" element={<IncidentView />} />
           <Route path="/incidents/:reportNo/:tab" element={<IncidentView />} />

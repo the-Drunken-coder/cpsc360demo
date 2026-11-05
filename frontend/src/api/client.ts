@@ -1,6 +1,6 @@
 import { compactFilters, toSearchParams } from "../domain/filters";
 import type {
-  AuditEntry, BreakdownDimension, BreakdownResponse, Facets, Filters, IncidentDetail, IncidentPage, IncidentSort,
+  AIHazardResult, GoSettings, AuditEntry, BreakdownDimension, BreakdownResponse, Facets, Filters, IncidentDetail, IncidentPage, IncidentSort,
   IngestBatch, Investigation, InvestigationStatus, InvestigationSummaryRow, Note, PatternAnalysis, RelatedIncident,
   RelationReview, SavedQuery, SavedSearch, Session, SourceStatus, SourceVersion, SpikeDimension, SpikesResponse,
   SummarySnapshot, TrendGroupBy, TrendInterval, TrendResponse, User, Verdict,
@@ -76,6 +76,10 @@ async function none(method: string, path: string): Promise<void> {
 const enc = encodeURIComponent;
 
 export const api = {
+  goSettings: () => json<GoSettings>("GET", "/settings/opencode-go"),
+  goModels: () => json<string[]>("GET", "/settings/opencode-go/models"),
+  saveGoSettings: (body: { api_key?: string; model?: string }) => json<GoSettings>("PUT", "/settings/opencode-go", body),
+  classifyHazards: (reportNos: string[]) => json<AIHazardResult[]>("POST", "/ai/hazards", { report_nos: reportNos }),
   users: () => json<User[]>("GET", "/users", undefined, undefined, false),
   createSession: (handle: string) => json<Session>("POST", "/session", { handle }, undefined, false),
 

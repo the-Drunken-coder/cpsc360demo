@@ -1,3 +1,4 @@
+import { AIClassifyButton } from "../../components/AIClassifyButton";
 import { AnchorButton, Button, ButtonGroup, Classes, HTMLSelect, NonIdealState, Spinner, Tooltip } from "@blueprintjs/core";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
@@ -102,6 +103,7 @@ export function ExplorerView() {
             <span className="toolbar-selection">{selection.selected.length} selected</span>
           )}
           <BulkActions reportNos={selection.selected} onClear={selection.clear} />
+          {selection.selected.length > 0 && <AIClassifyButton reportNos={selection.selected} bulk />}
           <HTMLSelect minimal value={sort} aria-label="Sort"
             onChange={(e) => update({ sort: e.currentTarget.value as IncidentSort, page: 1 })}>
             {sortOptions.map((s) => <option key={s} value={s}>{SORT_LABELS[s]}</option>)}

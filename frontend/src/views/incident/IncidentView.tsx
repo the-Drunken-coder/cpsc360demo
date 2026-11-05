@@ -1,3 +1,4 @@
+import { AIHazards } from "./AIHazards";
 import { Breadcrumbs, Button, Classes, NonIdealState, Spinner, Tab, Tabs, Tag } from "@blueprintjs/core";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
@@ -70,6 +71,7 @@ export function IncidentView() {
             </div>
             <div className="incident-side">
               <HazardEvidence hazards={d.inferred.hazards} />
+              <AIHazards reportNo={r.report_no} results={d.inferred.ai_hazards} />
               <Section title="Canonical keys" tier="inferred" method={d.inferred.method}>
                 <dl className="kv">
                   <div className="kv-row"><dt>Manufacturer</dt><dd>{d.inferred.manufacturer_display_name} <span className="mono muted">{d.inferred.manufacturer_key}</span></dd></div>
