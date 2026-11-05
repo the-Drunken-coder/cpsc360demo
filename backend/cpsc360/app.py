@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import re
@@ -13,7 +14,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import JSONResponse
 from psycopg.types.json import Jsonb
 
-from . import analytics, ingest, models as m, workspace as w
+from . import ai_hazards, opencode_go, analytics, ingest, models as m, workspace as w
 from .derive import HAZARD_LABELS
 from .search import FACETS, JOIN, connection, filters_sql, index, pair_reasons, reports, summaries, summary
 from .source_csv import COLUMNS, INCIDENT_COLUMNS
@@ -143,7 +144,7 @@ def detail(report_no: str, actor: Auth):
         reviews = conn.execute('SELECT * FROM workspace.relation_review WHERE report_a=%s OR report_b=%s', (report_no, report_no)).fetchall()
         batch = conn.execute('SELECT * FROM source.ingest_batch WHERE id=%s', (row['batch_id'],)).fetchone()
         comments = parse_comments(row['company_comments'])
-        return m.IncidentDetail(reported={k: row[k] for k in INCIDENT_COLUMNS}, company_comments=comments, inferred={**row, 'hazards': [{**h, 'label': HAZARD_LABELS[h['hazard']]} for h in hazards], 'manufacturer_display_name': manufacturer['display_name'] if manufacturer else row['manufacturer_name']}, analyst={'investigations': investigations, 'relation_reviews': [w.review(conn, r) for r in reviews]}, source={'current_sha256': row['current_sha256'], 'batch': batch, 'versions': versions(conn, report_no, False), 'public_search_url': 'https://www.saferproducts.gov/PublicSearch', 'disclaimer': DISCLAIMER})
+        return m.IncidentDetail(reported={k: row[k] for k in INCIDENT_COLUMNS}, company_comments=comments, inferred={**row, 'ai_hazards': ai_results(conn, report_no), 'hazards': [{**h, 'label': HAZARD_LABELS[h['hazard']]} for h in hazards], 'manufacturer_display_name': manufacturer['display_name'] if manufacturer else row['manufacturer_name']}, analyst={'investigations': investigations, 'relation_reviews': [w.review(conn, r) for r in reviews]}, source={'current_sha256': row['current_sha256'], 'batch': batch, 'versions': versions(conn, report_no, False), 'public_search_url': 'https://www.saferproducts.gov/PublicSearch', 'disclaimer': DISCLAIMER})
 
 
 DISCLAIMER = (Path(__file__).with_name('disclaimer.txt')).read_text().strip()
@@ -386,3 +387,96 @@ def sync_source(actor: Lead):
     with connection() as conn:
         ids = [r['batch_id'] for r in result]
         return conn.execute('SELECT * FROM source.ingest_batch WHERE id=ANY(%s) ORDER BY id', (ids,)).fetchall()
+
+
+
+def integration(conn):
+    return conn.execute("SELECT * FROM workspace.integration_setting WHERE provider='opencode_go'").fetchone()
+
+
+def setting_response(conn, row):
+    return m.IntegrationSetting(configured=bool(row and row['api_key']),
+        key_hint=row['api_key'][-4:] if row and row['api_key'] else None,
+        model=row['model'] if row else opencode_go.DEFAULT_MODEL,
+        updated_by=w.user(conn, row['updated_by']) if row and row['updated_by'] else None,
+        updated_at=row['updated_at'] if row else None)
+
+
+@app.get('/api/settings/opencode-go', response_model=m.IntegrationSetting)
+def get_go_setting(actor: Auth):
+    with connection() as conn:
+        return setting_response(conn, integration(conn))
+
+
+@app.put('/api/settings/opencode-go', response_model=m.IntegrationSetting)
+async def put_go_setting(body: m.IntegrationInput, actor: Lead):
+    if body.model is not None:
+        try:
+            available = await opencode_go.list_chat_models()
+        except opencode_go.UpstreamError as exc:
+            raise HTTPException(502, str(exc)) from exc
+        if body.model not in available:
+            raise HTTPException(422, 'Select a chat-completions model from OpenCode Go')
+    with connection() as conn:
+        conn.execute("SELECT pg_advisory_xact_lock(hashtext('opencode_go'))")
+        before = integration(conn)
+        key = body.api_key.strip() if body.api_key is not None else before['api_key'] if before else None
+        model = body.model if body.model is not None else before['model'] if before else opencode_go.DEFAULT_MODEL
+        row = conn.execute("INSERT INTO workspace.integration_setting (provider,api_key,model,updated_by) VALUES ('opencode_go',%s,%s,%s) ON CONFLICT (provider) DO UPDATE SET api_key=excluded.api_key,model=excluded.model,updated_by=excluded.updated_by,updated_at=now() RETURNING *", (key or None, model, actor.id)).fetchone()
+        w.audit(conn, actor, 'integration.update', 'integration_setting', 'opencode_go',
+                {'model': before['model'], 'api_key': 'set' if before['api_key'] else 'cleared'} if before else None,
+                {'model': model, 'api_key': 'set' if key else 'cleared'})
+        return setting_response(conn, row)
+
+
+@app.get('/api/settings/opencode-go/models', response_model=list[str])
+async def go_models(actor: Auth):
+    try:
+        return await opencode_go.list_chat_models()
+    except opencode_go.UpstreamError as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
+def ai_result(conn, row):
+    return m.AIHazardResult(**{**row, 'stale': row.get('stale', False),
+        'hazards': [{**h, 'label': HAZARD_LABELS[h['hazard']]} for h in row['hazards']],
+        'classified_by': w.user(conn, row['classified_by']) if row['classified_by'] else None})
+
+
+def ai_results(conn, report_no):
+    return [ai_result(conn, row) for row in conn.execute('SELECT a.*, a.source_sha256 IS DISTINCT FROM i.current_sha256 AS stale FROM inference.ai_hazard a JOIN source.incident i USING (report_no) WHERE a.report_no=%s ORDER BY a.classified_at DESC', (report_no,))]
+
+
+@app.post('/api/ai/hazards', response_model=list[m.AIHazardResult])
+async def classify_hazards(body: m.AISelection, actor: Writer):
+    with connection() as conn:
+        setting = integration(conn)
+        if not setting or not setting['api_key']:
+            raise HTTPException(409, 'Configure an OpenCode Go API key in Settings before classifying hazards')
+        ids = list(dict.fromkeys(body.report_nos))
+        rows = reports(conn, ids)
+        if len(rows) != len(ids):
+            raise HTTPException(404, 'One or more reports do not exist')
+    semaphore = asyncio.Semaphore(6)
+
+    async def classify(row):
+        raw, error, upstream_status = None, None, None
+        hazards, dropped = [], []
+        async with semaphore:
+            try:
+                raw = await opencode_go.chat_complete(setting['api_key'], setting['model'], ai_hazards.messages(row['incident_description']), f'cpsc360-hazards-{actor.id}')
+                hazards, dropped = ai_hazards.validate(raw.replace(setting['api_key'], '[redacted]'), row['incident_description'])
+            except opencode_go.UpstreamError as exc:
+                error, upstream_status = str(exc).replace(setting['api_key'], '[redacted]'), exc.status
+            except (ValueError, TypeError) as exc:
+                error = f'Invalid hazard JSON: {exc}'
+        with connection() as conn:
+            saved = conn.execute('INSERT INTO inference.ai_hazard (report_no,model,prompt_version,status,hazards,dropped,raw_response,error,classified_by,source_sha256) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (report_no,model) DO UPDATE SET source_sha256=excluded.source_sha256,prompt_version=excluded.prompt_version,status=excluded.status,hazards=excluded.hazards,dropped=excluded.dropped,raw_response=excluded.raw_response,error=excluded.error,classified_by=excluded.classified_by,classified_at=now() RETURNING *',
+                (row['report_no'], setting['model'], ai_hazards.PROMPT_VERSION, 'error' if error else 'ok', Jsonb(hazards), Jsonb(dropped), raw, error, actor.id, row['current_sha256'])).fetchone()
+            return ai_result(conn, saved), upstream_status
+
+    results = await asyncio.gather(*(classify(row) for row in rows))
+    for result, status in results:
+        if status in (401, 403, 429):
+            raise HTTPException(502, result.error)
+    return [result for result, _ in results]

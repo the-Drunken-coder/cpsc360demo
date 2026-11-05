@@ -17,6 +17,42 @@ class User(BaseModel):
     role: Role
 
 
+class IntegrationSetting(BaseModel):
+    configured: bool
+    key_hint: str | None
+    model: str
+    updated_by: User | None
+    updated_at: datetime | None
+
+
+class IntegrationInput(BaseModel):
+    api_key: str | None = None
+    model: str | None = Field(default=None, min_length=1)
+
+
+class AISelection(BaseModel):
+    report_nos: list[str] = Field(min_length=1, max_length=50)
+
+
+class AIHazardTag(BaseModel):
+    hazard: HazardKey
+    label: str
+    evidence: list[str]
+
+
+class AIHazardResult(BaseModel):
+    report_no: str
+    model: str
+    prompt_version: str
+    status: Literal['ok', 'error']
+    hazards: list[AIHazardTag]
+    dropped: list[dict[str, Any]]
+    error: str | None
+    classified_by: User | None
+    classified_at: datetime
+    stale: bool
+
+
 class Filters(BaseModel):
     q: str | None = None
     product_category: list[str] = Field(default_factory=list)
@@ -178,6 +214,7 @@ class Reported(BaseModel):
 
 
 class Inferred(BaseModel):
+    ai_hazards: list[AIHazardResult] = Field(default_factory=list)
     hazards: list[HazardTag]
     manufacturer_key: str
     manufacturer_display_name: str

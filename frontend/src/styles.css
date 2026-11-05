@@ -316,3 +316,14 @@ mark, .term-mark { background: rgba(251, 208, 101, 0.28); color: inherit; paddin
 .bp5-omnibar { top: 12vh; }
 
 .breakdown-table tr.not-drillable { cursor: default; }
+
+.settings-view { width: min(720px, 100%); padding: 28px; margin: 0 auto; overflow: auto; }
+.settings-actions { display: flex; gap: 10px; margin: 18px 0; }
+.ai-hazards { border-left: 3px solid var(--blue); background: var(--selected); }
+.ai-hazards article { padding-top: 10px; border-top: 1px solid var(--line); margin-top: 14px; overflow-wrap: anywhere; }
+.ai-hazards blockquote { margin: 10px 0; padding-left: 12px; border-left: 2px solid var(--blue); }
+.ai-hazards pre { white-space: pre-wrap; }
+
+@media (max-width: 1450px) {
+  .app-navbar .source-status-line { display: none; }
+}
