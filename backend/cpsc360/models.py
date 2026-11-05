@@ -25,6 +25,7 @@ class Filters(BaseModel):
     brand: str | None = None
     model: str | None = None
     hazard: list[HazardKey] = Field(default_factory=list)
+    hazard_all: list[HazardKey] = Field(default_factory=list)
     severity: list[str] = Field(default_factory=list)
     state: list[str] = Field(default_factory=list)
     submitter_category: list[str] = Field(default_factory=list)

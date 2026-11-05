@@ -5,7 +5,7 @@ import { HAZARD_LABELS, isHazardKey } from "../domain/hazards";
 import { FILTER_LABELS } from "../domain/labels";
 
 function valueLabel(key: FilterKey, value: string, facets: Facets | undefined): string {
-  if (key === "hazard" && isHazardKey(value)) return HAZARD_LABELS[value];
+  if ((key === "hazard" || key === "hazard_all") && isHazardKey(value)) return HAZARD_LABELS[value];
   if (key === "in_investigation") return `#${value}`;
   const facet = facets?.[key as FacetField];
   return facet?.find((f) => f.value === value)?.label ?? value;

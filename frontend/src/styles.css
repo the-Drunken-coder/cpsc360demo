@@ -314,3 +314,5 @@ mark, .term-mark { background: rgba(251, 208, 101, 0.28); color: inherit; paddin
 .column-option { list-style: none; padding: 2px 8px; }
 .column-option .bp5-control { margin: 0; }
 .bp5-omnibar { top: 12vh; }
+
+.breakdown-table tr.not-drillable { cursor: default; }

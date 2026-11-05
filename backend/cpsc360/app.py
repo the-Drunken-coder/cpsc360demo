@@ -152,7 +152,7 @@ DISCLAIMER = (Path(__file__).with_name('disclaimer.txt')).read_text().strip()
 def parse_comments(text):
     if not text:
         return []
-    matches = list(re.finditer(r'\((\d{1,2}/\d{1,2}/\d{4})\)\s*([^:]+):', text))
+    matches = list(re.finditer(r'(?:^|\n)\s*\((\d{1,2}/\d{1,2}/\d{4})\)\s*([^:\n]+):', text))
     if not matches:
         company, sep, body = text.partition(':')
         return [{'date': None, 'company': company.strip() if sep else None, 'text': body.strip() if sep else text}]
@@ -274,6 +274,8 @@ def remove_incident(id: int, report_no: str, actor: Writer):
     with connection() as conn:
         w.investigation(conn, id, actor)
         before = conn.execute('DELETE FROM workspace.investigation_incident WHERE investigation_id=%s AND report_no=%s RETURNING *', (id,report_no)).fetchone()
+        if before is None:
+            raise HTTPException(404, f'{report_no} is not in investigation {id}')
         conn.execute('UPDATE workspace.investigation SET updated_at=now() WHERE id=%s', (id,))
         w.audit(conn, actor, 'member.remove', 'investigation', id, before)
         return w.investigation(conn, id, actor)

@@ -9,6 +9,7 @@ export const FILTER_LABELS: Record<FilterKey, string> = {
   brand: "Brand",
   model: "Model",
   hazard: "Hazard (inferred)",
+  hazard_all: "Also has hazard",
   severity: "Severity",
   state: "State",
   submitter_category: "Submitter",

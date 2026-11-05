@@ -1,4 +1,5 @@
 import csv
+import html
 import io
 import math
 
@@ -186,3 +187,44 @@ def test_summary_claims_cite_only_the_reports_they_count(client, headers, worksp
     assert injury_claim['text'] == '2 reports describe an injury.'
     assert set(injury_claim['citations']) == {r['report_no'] for r in injured if r['severity'] != 'Death'}
     assert all('..' not in c['text'] and ' 1 reports' not in c['text'] for s in snapshot['sections'] for c in s['claims'])
+
+
+def test_search_snippets_are_verbatim_excerpts_of_the_narrative(client, headers):
+    for q in ['fire crews', 'blendjet']:
+        items = get(client, headers, '/api/incidents', params={'q': q, 'page_size': 50})['items']
+        with connection() as conn:
+            rows = conn.execute('SELECT report_no, incident_description FROM source.incident WHERE report_no = ANY(%s)', ([i['report_no'] for i in items],)).fetchall()
+        narratives = {r['report_no']: r['incident_description'] for r in rows}
+        assert any('<mark>' in item['snippet'] for item in items)
+        for item in items:
+            excerpt = html.unescape(item['snippet'].replace('<mark>', '').replace('</mark>', ''))
+            assert ' '.join(excerpt.split()) in ' '.join(narratives[item['report_no']].split()), item['report_no']
+
+
+def test_short_models_filter_and_generic_models_never_link(client, headers):
+    with connection() as conn:
+        stored = conn.execute("SELECT count(*) n FROM source.incident WHERE model='GT'").fetchone()['n']
+        generic = conn.execute("SELECT count(*) n FROM inference.incident_norm WHERE model_key IN ('idonotknow','seeabove','unknown','classic')").fetchone()['n']
+        origin = conn.execute("SELECT report_no FROM source.incident WHERE model ILIKE 'I do not know' LIMIT 1").fetchone()['report_no']
+    assert stored > 0 and get(client, headers, '/api/incidents?model=GT')['total'] == stored
+    assert generic == 0
+    related = get(client, headers, f'/api/incidents/{origin}/related')
+    assert not any(r['kind'] == 'same_model' for item in related for r in item['reasons'])
+
+
+def test_hazard_drilldown_filter_matches_breakdown_count(client, headers):
+    rows = get(client, headers, '/api/analytics/breakdown?hazard=fire&dimension=hazard&limit=30')['rows']
+    burn = next(r for r in rows if r['key'] == 'burn')
+    assert get(client, headers, '/api/incidents?hazard=fire&hazard_all=burn&page_size=1')['total'] == burn['count']
+
+
+def test_removing_a_non_member_is_404_and_not_audited(client, headers, workspace_cleanup):
+    inv = client.post('/api/investigations', headers=headers['jrivera'], json={'title': '[test] non-member'}).json()
+    path = f"/api/investigations/{inv['id']}"
+    assert client.delete(path + '/incidents/not-a-report', headers=headers['jrivera']).status_code == 404
+    assert [a['action'] for a in get(client, headers, path + '/audit')] == ['investigation.create']
+
+
+def test_company_responses_split_only_at_line_starts(client, headers):
+    detail = get(client, headers, '/api/incidents/20220306-541AF-2147357338')
+    assert [c['company'] for c in detail['company_comments']] == ['Bestway Inflatables & Material Corp.']

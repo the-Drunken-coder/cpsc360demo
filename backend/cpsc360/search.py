@@ -44,10 +44,13 @@ def filters_sql(filters: Filters, omit: str | None = None):
     if filters.hazard and omit != 'hazard':
         clauses.append('EXISTS (SELECT 1 FROM inference.incident_hazard h WHERE h.report_no=i.report_no AND h.hazard=ANY(%s))')
         args.append(filters.hazard)
-    for field, key in [('brand', derive.brand_key), ('model', derive.model_key)]:
+    for hazard in filters.hazard_all:
+        clauses.append('EXISTS (SELECT 1 FROM inference.incident_hazard h WHERE h.report_no=i.report_no AND h.hazard=%s)')
+        args.append(hazard)
+    for field in ['brand', 'model']:
         if getattr(filters, field) is not None:
-            clauses.append(f'n.{field}_key = %s')
-            args.append(key(getattr(filters, field)))
+            clauses.append(f"regexp_replace(lower(coalesce(i.{field}, '')), '[^a-z0-9]', '', 'g') = %s")
+            args.append(derive.match_text(getattr(filters, field)))
     if filters.q:
         clauses.append("i.search @@ websearch_to_tsquery('english', %s)")
         args.append(filters.q)
@@ -78,9 +81,10 @@ def summaries(conn, filters: Filters, sort=None, limit=50, offset=0):
         sorting = order.get(sort, order['report_date'])
     rows = conn.execute('SELECT ' + FIELDS + JOIN + where + f' ORDER BY {sorting},i.report_no LIMIT %s OFFSET %s', [*args, limit, offset]).fetchall()
     if filters.q and rows:
-        excerpts = conn.execute("SELECT report_no, ts_headline('english', narrative, websearch_to_tsquery('english',%s), 'StartSel=, StopSel=, MaxWords=40, MinWords=20') snippet FROM unnest(%s::text[],%s::text[]) AS t(report_no,narrative)", (filters.q, [r['report_no'] for r in rows], [r['incident_description'] for r in rows])).fetchall()
-        marked = conn.execute("SELECT report_no, ts_headline('english', narrative, websearch_to_tsquery('english',%s), 'StartSel=<mark>, StopSel=</mark>, HighlightAll=true') snippet FROM unnest(%s::text[],%s::text[]) AS t(report_no,narrative)", (filters.q, [r['report_no'] for r in excerpts], [html.escape(r['snippet']) for r in excerpts])).fetchall()
-        snippets = {r['report_no']: r['snippet'] for r in marked}
+        # Headline already-escaped text so tag-like narrative text such as "<ser #123>" survives;
+        # alphanumeric sentinels mark matches because ts_headline cannot be given an empty or HTML selector.
+        marked = conn.execute("SELECT report_no, ts_headline('english', narrative, websearch_to_tsquery('english',%s), 'StartSel=QQCPSCMARKQQ, StopSel=QQCPSCENDQQ, MaxWords=40, MinWords=20') snippet FROM unnest(%s::text[],%s::text[]) AS t(report_no,narrative)", (filters.q, [r['report_no'] for r in rows], [html.escape(r['incident_description']) for r in rows])).fetchall()
+        snippets = {m['report_no']: m['snippet'].replace('QQCPSCMARKQQ', '<mark>').replace('QQCPSCENDQQ', '</mark>') for m in marked}
         for row in rows:
             row['_snippet'] = snippets[row['report_no']]
     return total, [summary(conn, row) for row in rows]

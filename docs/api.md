@@ -74,6 +74,7 @@ interface Filters {
   brand?: string;                  // case-insensitive equality on brand_key
   model?: string;                  // case-insensitive equality on model_key
   hazard?: HazardKey[];
+  hazard_all?: HazardKey[];        // every listed hazard must be present (AND), on top of `hazard`
   severity?: string[];
   state?: string[];
   submitter_category?: string[];

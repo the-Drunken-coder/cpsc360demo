@@ -38,6 +38,7 @@ export interface Filters {
   brand?: string;
   model?: string;
   hazard?: HazardKey[];
+  hazard_all?: HazardKey[];
   severity?: string[];
   state?: string[];
   submitter_category?: string[];

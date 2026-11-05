@@ -3,18 +3,26 @@
 import re
 from dataclasses import dataclass
 
-NORM_METHOD = "keys-v1"
+NORM_METHOD = "keys-v2"
+GENERIC_MODEL_MANUFACTURERS = 5
 HAZARD_METHOD = "hazard-rules-v2"
 
 _PLACEHOLDERS = {
     "unknown", "unk", "na", "n/a", "none", "no", "idk", "idontknow", "notsure", "unsure",
     "dontknow", "notknown", "notavailable", "nomodel", "nomodelnumber", "unknownmodel",
     "notapplicable", "redacted", "noidea", "cantremember", "notlisted", "various",
+    "idonotknow", "donotknow", "unavailable", "notprovided", "noneprovided", "nonelisted",
+    "seeabove", "seebelow", "seephoto", "seephotos", "seepicture", "seepictures", "vinredacted",
 }
 _MFR_SUFFIXES = {
     "inc", "incorporated", "corp", "corporation", "co", "company", "llc", "ltd", "limited",
     "lp", "llp", "plc", "the", "usa", "us", "america", "americas", "na", "intl", "international",
 }
+
+
+def match_text(value: str | None) -> str:
+    """Letters and digits only, lowercased: the form brand and model values are compared in."""
+    return _alnum(value or "")
 
 
 def _alnum(value: str) -> str:
@@ -34,9 +42,12 @@ def brand_key(brand: str | None) -> str | None:
 
 
 def model_key(model: str | None) -> str | None:
-    """Model numbers compare on letters and digits only. Placeholders and very short values never match."""
+    """Model numbers compare on letters and digits only. Placeholders and single characters never match.
+
+    ingest.rebuild_inference also drops keys reported for many manufacturers, since those identify nothing.
+    """
     key = _alnum(model or "")
-    return key if len(key) >= 3 and key not in _PLACEHOLDERS else None
+    return key if len(key) >= 2 and key not in _PLACEHOLDERS else None
 
 
 @dataclass(frozen=True)

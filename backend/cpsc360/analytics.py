@@ -16,6 +16,8 @@ def grouping(dimension):
 
 
 def label(conn, dimension, key):
+    if key == '__unknown__':
+        return 'Not reported'
     if dimension == 'hazard':
         return HAZARD_LABELS.get(key, key)
     if dimension == 'manufacturer_key':

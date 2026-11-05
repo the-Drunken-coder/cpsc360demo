@@ -11,6 +11,7 @@ const FILTER_FIELDS: { [K in keyof Required<Filters>]: FieldKind } = {
   brand: "text",
   model: "text",
   hazard: "list",
+  hazard_all: "list",
   severity: "list",
   state: "list",
   submitter_category: "list",
@@ -32,7 +33,7 @@ export function parseFilters(params: URLSearchParams): Filters {
     const kind = FILTER_FIELDS[key];
     if (kind === "list") {
       const values = params.getAll(key).filter((v) => v !== "");
-      const valid = key === "hazard" ? values.filter(isHazardKey) : values;
+      const valid = key === "hazard" || key === "hazard_all" ? values.filter(isHazardKey) : values;
       if (valid.length > 0) out[key] = valid;
       continue;
     }

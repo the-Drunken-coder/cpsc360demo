@@ -10,7 +10,7 @@ import { ActiveFilters } from "../../components/ActiveFilters";
 import { Provenance } from "../../components/Provenance";
 import { fmtCount } from "../../components/text";
 import { explorerHref, parseFilters, toSearchParams, withFilter } from "../../domain/filters";
-import { isHazardKey } from "../../domain/hazards";
+import { isDrillable, withGroup } from "../../domain/drilldown";
 import { DIMENSION_LABELS } from "../../domain/labels";
 import { clampRange, periodRange } from "../../domain/periods";
 import { TrendChart } from "./TrendChart";
@@ -23,11 +23,6 @@ const WINDOWS = [30, 60, 90, 180];
 
 function pick<T extends string>(value: string | null, options: readonly T[], fallback: T): T {
   return options.find((o) => o === value) ?? fallback;
-}
-
-function withGroup(filters: Filters, dimension: BreakdownDimension | Exclude<TrendGroupBy, "none">, key: string): Filters {
-  if (dimension === "hazard") return isHazardKey(key) ? withFilter(filters, "hazard", [key]) : filters;
-  return withFilter(filters, dimension, [key]);
 }
 
 function useAnalyticsParams() {
@@ -74,7 +69,7 @@ export function AnalyticsView() {
   const openTrendPoint = (seriesIndex: number, period: string) => {
     const t = trend.data;
     const s = t?.series[seriesIndex];
-    if (!t || !s || s.key === "__other__") return;
+    if (!t || !s || !isDrillable(s.key)) return;
     const range = clampRange(periodRange(period, t.interval), { from: filters.report_date_from, to: filters.report_date_to });
     let next: Filters = { ...filters, report_date_from: range.from, report_date_to: range.to };
     if (view.group_by !== "none") next = withGroup(next, view.group_by, s.key);
@@ -140,7 +135,9 @@ export function AnalyticsView() {
               <thead><tr><th>{DIMENSION_LABELS[breakdown.data.dimension]}</th><th className="num">Reports</th><th /><th className="num">Injury</th><th className="num">Death</th></tr></thead>
               <tbody>
                 {breakdown.data.rows.map((r) => (
-                  <tr key={r.key} onClick={() => navigate(explorerHref(withGroup(filters, breakdown.data.dimension, r.key)))}>
+                  <tr key={r.key} className={isDrillable(r.key) ? undefined : "not-drillable"}
+                    title={isDrillable(r.key) ? undefined : "Reports with no value here cannot be filtered on"}
+                    onClick={() => isDrillable(r.key) && navigate(explorerHref(withGroup(filters, breakdown.data.dimension, r.key)))}>
                     <td className="cell-clip" title={r.label}>{r.label}</td>
                     <td className="num">{fmtCount(r.count)}</td>
                     <td className="bar-cell"><div className="inline-bar" style={{ width: `${(r.count / maxCount) * 100}%` }} /></td>
