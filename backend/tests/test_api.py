@@ -295,3 +295,15 @@ def test_a_report_missing_from_the_text_index_is_a_clear_409(client, headers):
         assert response.status_code == 409 and 'text index' in response.json()['detail']
     finally:
         index.positions[report] = position
+
+
+def test_a_report_found_by_reloading_uses_the_reloaded_matrix(client, headers):
+    report = get(client, headers, '/api/incidents?page_size=1')['items'][0]['report_no']
+    saved = index.matrix, index.positions, index.batch
+    index.matrix = index.matrix[:1]
+    index.positions = {}
+    index.batch = None
+    try:
+        assert client.get(f'/api/incidents/{report}/related', headers=headers['jrivera']).status_code == 200
+    finally:
+        index.matrix, index.positions, index.batch = saved

@@ -149,19 +149,22 @@ class TextIndex:
 
     def neighbors(self, report):
         with self.lock:
-            scores = (self.matrix @ self.matrix[self.position(report)].T).toarray().ravel()
+            row = self.position(report)
+            scores = (self.matrix @ self.matrix[row].T).toarray().ravel()
             indices = np.argsort(-scores)[:301]
             return {self.ids[i]: float(scores[i]) for i in indices if self.ids[i] != report}
 
     def pair(self, a, b):
         with self.lock:
-            product = self.matrix[self.position(a)].multiply(self.matrix[self.position(b)])
+            rows = self.position(a), self.position(b)
+            product = self.matrix[rows[0]].multiply(self.matrix[rows[1]])
             order = np.argsort(-product.data)[:8]
             return float(product.sum()), [str(self.terms[product.indices[i]]) for i in order]
 
     def shared(self, ids):
         with self.lock:
-            subset = self.matrix[[self.position(r) for r in ids]]
+            rows = [self.position(r) for r in ids]
+            subset = self.matrix[rows]
             count = np.asarray((subset > 0).sum(axis=0)).ravel()
             weight = np.asarray(subset.sum(axis=0)).ravel()
             candidates = np.flatnonzero(count >= 2)
