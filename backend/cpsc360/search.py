@@ -1,0 +1,167 @@
+import html
+import pickle
+import threading
+from pathlib import Path
+
+import numpy as np
+from fastapi import HTTPException
+from psycopg.rows import dict_row
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from . import derive
+from .db import connect
+from .models import Filters, IncidentSummary, Reason
+
+JOIN = ''' FROM source.incident i
+JOIN inference.incident_norm n USING (report_no)
+LEFT JOIN source.severity_level s ON s.label=i.severity '''
+FIELDS = '''i.*, n.manufacturer_key,n.brand_key,n.model_key,n.method,
+coalesce(s.rank,0) severity_rank, coalesce(s.is_injury,false) is_injury,
+(coalesce(i.company_comments,'') <> '') has_company_comment,
+ARRAY(SELECT hazard FROM inference.incident_hazard h WHERE h.report_no=i.report_no ORDER BY hazard) hazards,
+ARRAY(SELECT investigation_id FROM workspace.investigation_incident w WHERE w.report_no=i.report_no ORDER BY investigation_id) investigation_ids'''
+FACETS = ['product_category', 'product_code', 'manufacturer_key', 'hazard', 'severity', 'state', 'submitter_category']
+
+
+def connection():
+    conn = connect()
+    conn.row_factory = dict_row
+    return conn
+
+
+def filters_sql(filters: Filters, omit: str | None = None):
+    clauses, args = [], []
+    for field in ['product_category', 'product_code', 'manufacturer_key', 'severity', 'state', 'submitter_category']:
+        values = getattr(filters, field)
+        if values and omit != field:
+            alias = 'n' if field == 'manufacturer_key' else 'i'
+            clauses.append(f'{alias}.{field} = ANY(%s)')
+            args.append(values)
+    if filters.hazard and omit != 'hazard':
+        clauses.append('EXISTS (SELECT 1 FROM inference.incident_hazard h WHERE h.report_no=i.report_no AND h.hazard=ANY(%s))')
+        args.append(filters.hazard)
+    for field, key in [('brand', derive.brand_key), ('model', derive.model_key)]:
+        if getattr(filters, field) is not None:
+            clauses.append(f'n.{field}_key = %s')
+            args.append(key(getattr(filters, field)))
+    if filters.q:
+        clauses.append("i.search @@ websearch_to_tsquery('english', %s)")
+        args.append(filters.q)
+    for field, op in [('report_date_from', '>='), ('report_date_to', '<=')]:
+        if getattr(filters, field):
+            clauses.append(f'i.report_date {op} %s')
+            args.append(getattr(filters, field))
+    if filters.injury_only is not None:
+        clauses.append('coalesce(s.is_injury,false) = %s')
+        args.append(filters.injury_only)
+    if filters.has_company_comment is not None:
+        clauses.append("(coalesce(i.company_comments,'') <> '') = %s")
+        args.append(filters.has_company_comment)
+    if filters.in_investigation is not None:
+        clauses.append('EXISTS (SELECT 1 FROM workspace.investigation_incident w WHERE w.report_no=i.report_no AND investigation_id=%s)')
+        args.append(filters.in_investigation)
+    return ' WHERE ' + (' AND '.join(clauses) or 'true'), args
+
+
+def summaries(conn, filters: Filters, sort=None, limit=50, offset=0):
+    where, args = filters_sql(filters)
+    total = conn.execute('SELECT count(*) total' + JOIN + where, args).fetchone()['total']
+    order = {'report_date': 'i.report_date DESC', '-report_date': 'i.report_date ASC', 'severity': 'coalesce(s.rank,0) DESC', 'publication_date': 'i.publication_date DESC'}
+    if filters.q and sort in (None, 'relevance'):
+        sorting = "ts_rank_cd(i.search,websearch_to_tsquery('english',%s)) DESC"
+        args.append(filters.q)
+    else:
+        sorting = order.get(sort, order['report_date'])
+    rows = conn.execute('SELECT ' + FIELDS + JOIN + where + f' ORDER BY {sorting},i.report_no LIMIT %s OFFSET %s', [*args, limit, offset]).fetchall()
+    return total, [summary(conn, row, filters.q) for row in rows]
+
+
+def summary(conn, row, q=None):
+    if q:
+        snippet = conn.execute("SELECT ts_headline('english', %s, websearch_to_tsquery('english',%s), 'StartSel=, StopSel=, MaxWords=40, MinWords=20') text", (row['incident_description'], q)).fetchone()['text']
+        snippet = conn.execute("SELECT ts_headline('english', %s, websearch_to_tsquery('english',%s), 'StartSel=<mark>, StopSel=</mark>, HighlightAll=true') text", (html.escape(snippet), q)).fetchone()['text']
+    else:
+        snippet = html.escape(row['incident_description'][:240])
+    return IncidentSummary.model_validate({**row, 'snippet': snippet})
+
+
+def reports(conn, ids):
+    rows = conn.execute('SELECT ' + FIELDS + JOIN + ' WHERE i.report_no=ANY(%s)', (list(ids),)).fetchall()
+    found = {row['report_no']: row for row in rows}
+    if set(ids) - found.keys():
+        raise HTTPException(404, 'Report not found: ' + ', '.join(sorted(set(ids) - found.keys())))
+    return [found[r] for r in dict.fromkeys(ids)]
+
+
+class TextIndex:
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.batch = None
+
+    def load(self):
+        with self.lock, connection() as conn:
+            batch = conn.execute('SELECT max(id) id FROM source.ingest_batch').fetchone()['id']
+            if self.batch == batch:
+                return
+            cache = Path(__file__).resolve().parents[1] / '.data' / f'tfidf-{batch}.pickle'
+            if cache.exists():
+                with cache.open('rb') as stream:
+                    ids, vectorizer, matrix = pickle.load(stream)
+            else:
+                rows = conn.execute("SELECT report_no, incident_description || ' ' || product_description text FROM source.incident ORDER BY report_no").fetchall()
+                ids = [r['report_no'] for r in rows]
+                vectorizer = TfidfVectorizer(stop_words='english', sublinear_tf=True, ngram_range=(1, 2), min_df=2, max_df=0.5, dtype=np.float32)
+                matrix = vectorizer.fit_transform(r['text'] for r in rows)
+                cache.parent.mkdir(exist_ok=True)
+                temporary = cache.with_suffix('.tmp')
+                with temporary.open('wb') as stream:
+                    pickle.dump((ids, vectorizer, matrix), stream, protocol=5)
+                temporary.replace(cache)
+            self.ids = ids
+            self.positions = {report: i for i, report in enumerate(ids)}
+            self.matrix = matrix
+            self.terms = vectorizer.get_feature_names_out()
+            self.batch = batch
+
+    def neighbors(self, report):
+        with self.lock:
+            scores = (self.matrix @ self.matrix[self.positions[report]].T).toarray().ravel()
+            indices = np.argsort(-scores)[:301]
+            return {self.ids[i]: float(scores[i]) for i in indices if self.ids[i] != report}
+
+    def pair(self, a, b):
+        with self.lock:
+            product = self.matrix[self.positions[a]].multiply(self.matrix[self.positions[b]])
+            order = np.argsort(-product.data)[:8]
+            return float(product.sum()), [str(self.terms[product.indices[i]]) for i in order]
+
+    def shared(self, ids):
+        with self.lock:
+            subset = self.matrix[[self.positions[r] for r in ids]]
+            count = np.asarray((subset > 0).sum(axis=0)).ravel()
+            weight = np.asarray(subset.sum(axis=0)).ravel()
+            candidates = np.flatnonzero(count >= 2)
+            best = candidates[np.argsort(-weight[candidates])[:15]]
+            return [{'term': str(self.terms[t]), 'report_nos': [r for r, present in zip(ids, subset[:, t].toarray().ravel()) if present]} for t in best]
+
+
+index = TextIndex()
+REASON_WEIGHTS = {'associated_report': .5, 'same_model': .35, 'text_similarity': .4, 'same_manufacturer': .1, 'same_brand': .05, 'same_product_type': .05, 'shared_hazard': .05}
+
+
+def pair_reasons(a, b):
+    reasons = []
+    def add(kind, detail, multiplier=1, **extra):
+        reasons.append(Reason(kind=kind, weight=REASON_WEIGHTS[kind] * multiplier, detail=detail, **extra))
+    if b['report_no'] in a['associated_report_nos'] or a['report_no'] in b['associated_report_nos']:
+        add('associated_report', 'The published reports explicitly associate this pair.')
+    for field, kind, label in [('model_key', 'same_model', 'model'), ('manufacturer_key', 'same_manufacturer', 'manufacturer'), ('brand_key', 'same_brand', 'brand'), ('product_code', 'same_product_type', 'product code')]:
+        if a[field] is not None and a[field] == b[field]:
+            add(kind, f'Same {label}: {a[field]}')
+    hazards = sorted(set(a['hazards']) & set(b['hazards']))
+    if hazards:
+        add('shared_hazard', 'Shared inferred hazards: ' + ', '.join(derive.HAZARD_LABELS[h] for h in hazards), min(len(hazards), 2), hazards=hazards)
+    cosine, terms = index.pair(a['report_no'], b['report_no'])
+    if cosine >= .12:
+        add('text_similarity', f'Narrative and product text cosine similarity {cosine:.3f}.', cosine, terms=terms)
+    return sorted(reasons, key=lambda r: -r.weight)
