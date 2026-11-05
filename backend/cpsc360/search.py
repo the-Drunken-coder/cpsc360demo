@@ -139,31 +139,33 @@ class TextIndex:
             self.terms = vectorizer.get_feature_names_out()
             self.batch = batch
 
-    def position(self, report):
-        # A sync run from the CLI adds reports without telling a running API; reload once before giving up.
-        if report not in self.positions:
+    def rows(self, reports):
+        # A sync run from the CLI adds reports without telling a running API, so reload once on a miss.
+        # Every row comes from the same index generation as the matrix the caller reads next.
+        if any(r not in self.positions for r in reports):
             self.load()
-        if report not in self.positions:
-            raise HTTPException(409, f'{report} is not in the text index yet; rebuild inference and restart the API.')
-        return self.positions[report]
+        missing = [r for r in reports if r not in self.positions]
+        if missing:
+            raise HTTPException(409, f'{missing[0]} is not in the text index yet; rebuild inference and restart the API.')
+        return [self.positions[r] for r in reports]
 
     def neighbors(self, report):
         with self.lock:
-            row = self.position(report)
+            (row,) = self.rows([report])
             scores = (self.matrix @ self.matrix[row].T).toarray().ravel()
             indices = np.argsort(-scores)[:301]
             return {self.ids[i]: float(scores[i]) for i in indices if self.ids[i] != report}
 
     def pair(self, a, b):
         with self.lock:
-            rows = self.position(a), self.position(b)
+            rows = self.rows([a, b])
             product = self.matrix[rows[0]].multiply(self.matrix[rows[1]])
             order = np.argsort(-product.data)[:8]
             return float(product.sum()), [str(self.terms[product.indices[i]]) for i in order]
 
     def shared(self, ids):
         with self.lock:
-            rows = [self.position(r) for r in ids]
+            rows = self.rows(ids)
             subset = self.matrix[rows]
             count = np.asarray((subset > 0).sum(axis=0)).ravel()
             weight = np.asarray(subset.sum(axis=0)).ravel()

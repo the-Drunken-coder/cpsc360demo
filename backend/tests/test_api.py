@@ -307,3 +307,19 @@ def test_a_report_found_by_reloading_uses_the_reloaded_matrix(client, headers):
         assert client.get(f'/api/incidents/{report}/related', headers=headers['jrivera']).status_code == 200
     finally:
         index.matrix, index.positions, index.batch = saved
+
+
+def test_pair_rows_come_from_one_index_generation(client, headers):
+    a, b = [i['report_no'] for i in get(client, headers, '/api/incidents', params={'q': 'instant pot exploded', 'page_size': 2})['items']]
+    expected = client.post('/api/patterns', headers=headers['jrivera'], json={'report_nos': [a, b]}).json()['shared_terms']
+    assert expected
+    saved = index.matrix, index.positions, index.batch
+    index.matrix = index.matrix[:2]
+    index.positions = {a: 1}
+    index.batch = None
+    try:
+        response = client.post('/api/patterns', headers=headers['jrivera'], json={'report_nos': [a, b]})
+        assert response.status_code == 200
+        assert response.json()['shared_terms'] == expected
+    finally:
+        index.matrix, index.positions, index.batch = saved
