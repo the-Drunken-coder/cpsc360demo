@@ -1,7 +1,7 @@
 import { Classes, Dialog, DialogBody, HTMLTable, KeyComboTag, useHotkeys, type HotkeyConfig } from "@blueprintjs/core";
 import { useMemo, useRef } from "react";
 
-interface HotkeyDef { combo: string; label: string; group: "Global" | "Explorer" }
+interface HotkeyDef { combo: string; label: string; group: "Global" | "Explorer" | "Selection" }
 
 export const HOTKEYS = {
   omnibar: { combo: "mod+k", label: "Jump to a report, investigation, saved search, or view", group: "Global" },
@@ -12,7 +12,7 @@ export const HOTKEYS = {
   toggle: { combo: "x", label: "Toggle selection of the focused row", group: "Explorer" },
   open: { combo: "enter", label: "Open the focused report", group: "Explorer" },
   close: { combo: "esc", label: "Close the preview panel", group: "Explorer" },
-  compare: { combo: "c", label: "Compare selected reports", group: "Explorer" },
+  compare: { combo: "c", label: "Compare selected reports", group: "Selection" },
   investigate: { combo: "i", label: "Add selection to an investigation", group: "Explorer" },
   related: { combo: "r", label: "Related reports for the focused report", group: "Explorer" },
 } as const satisfies Record<string, HotkeyDef>;
@@ -30,8 +30,13 @@ export function useRegisteredHotkeys(handlers: HotkeyHandlers) {
       .map((id) => ({
         ...HOTKEYS[id],
         global: true,
-        preventDefault: id !== "open",
+        preventDefault: id !== "open" && id !== "compare",
         onKeyDown: (event: KeyboardEvent) => {
+          if (document.querySelector("[role=dialog], .bp5-omnibar")) return;
+          if (id === "compare") {
+            if (event.target instanceof Element && event.target.closest("select")) return;
+            event.preventDefault();
+          }
           // Enter on a link, button, or select must keep its native action.
           if (id === "open") {
             if ((event.target as HTMLElement | null)?.closest("a, button, select, [role=button]")) return;
@@ -47,7 +52,7 @@ export function useRegisteredHotkeys(handlers: HotkeyHandlers) {
 
 export function HotkeysHelp({ active, onClose }: { active: HotkeyConfig[]; onClose: () => void }) {
   const activeCombos = new Set(active.map((h) => h.combo));
-  const groups = ["Global", "Explorer"] as const;
+  const groups = ["Global", "Explorer", "Selection"] as const;
   return (
     <Dialog isOpen onClose={onClose} title="Keyboard shortcuts" icon="key-command" className="hotkeys-help">
       <DialogBody>

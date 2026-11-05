@@ -4,13 +4,15 @@ import {
 } from "@blueprintjs/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api, qk } from "../../api/client";
 import type { Reason, ReasonKind, RelatedIncident, Verdict } from "../../api/types";
 import { HazardTags } from "../../components/HazardTags";
 import { Provenance } from "../../components/Provenance";
-import { BulkActions } from "../../components/SelectionBadge";
+import { BulkActions, compareHref, MAX_COMPARE_REPORTS } from "../../components/SelectionBadge";
 import { Marked, ReportLink, fmtTime } from "../../components/text";
-import { toastError } from "../../components/toaster";
+import { toast, toastError } from "../../components/toaster";
+import { useRegisteredHotkeys } from "../../hotkeys/registry";
 import { useSession } from "../../session/SessionProvider";
 
 const REASON_LABELS: Record<ReasonKind, string> = {
@@ -25,8 +27,22 @@ const REASON_LABELS: Record<ReasonKind, string> = {
 
 export function RelatedList({ reportNo }: { reportNo: string }) {
   const related = useQuery({ queryKey: qk.related(reportNo), queryFn: () => api.related(reportNo) });
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<string[]>([]);
   const [hideRejected, setHideRejected] = useState(false);
+
+  useRegisteredHotkeys({
+    compare: () => {
+      const reports = selected.length > 0 ? [reportNo, ...selected] : [];
+      if (reports.length < 2) {
+        toast({ icon: "info-sign", message: "Select a related report to compare." });
+      } else if (reports.length > MAX_COMPARE_REPORTS) {
+        toast({ icon: "warning-sign", message: `Compare supports up to ${MAX_COMPARE_REPORTS} reports.` });
+      } else {
+        navigate(compareHref(reports));
+      }
+    },
+  });
 
   if (related.isPending) return <NonIdealState icon={<Spinner />} title="Scoring candidates" />;
   if (related.isError) return <NonIdealState icon="error" title="Related search failed" description={related.error.message} />;

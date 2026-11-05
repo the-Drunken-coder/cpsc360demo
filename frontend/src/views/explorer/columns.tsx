@@ -31,7 +31,7 @@ export const COLUMNS: Column[] = [
     id: "product", label: "Product", width: 220, defaultVisible: true,
     render: (r) => <span className="cell-clip" title={r.product_description}>{r.product_description}</span>,
   },
-  { id: "product_category", label: "Category", width: 150, defaultVisible: false, render: (r) => r.product_category },
+  { id: "product_category", label: "Category", width: 150, defaultVisible: false, render: (r) => <span title={r.product_category}>{r.product_category}</span> },
   {
     id: "product_type", label: "Product type", width: 160, defaultVisible: false,
     render: (r) => <span className="cell-clip" title={`${r.product_type ?? ""} (${r.product_code})`}>{r.product_type ?? r.product_code}</span>,
@@ -40,9 +40,9 @@ export const COLUMNS: Column[] = [
     id: "manufacturer", label: "Manufacturer", width: 140, defaultVisible: true,
     render: (r) => <span className="cell-clip" title={`Reported: ${r.manufacturer_name}`}>{r.manufacturer_name}</span>,
   },
-  { id: "brand", label: "Brand", width: 110, defaultVisible: false, render: (r) => r.brand ?? "" },
-  { id: "model", label: "Model", width: 100, defaultVisible: true, render: (r) => <span className="mono">{r.model ?? ""}</span> },
-  { id: "state", label: "State", width: 96, defaultVisible: false, render: (r) => r.state ?? "" },
+  { id: "brand", label: "Brand", width: 110, defaultVisible: false, render: (r) => <span title={r.brand ?? undefined}>{r.brand ?? ""}</span> },
+  { id: "model", label: "Model", width: 100, defaultVisible: true, render: (r) => <span className="mono" title={r.model ?? undefined}>{r.model ?? ""}</span> },
+  { id: "state", label: "State", width: 96, defaultVisible: false, render: (r) => <span title={r.state ?? undefined}>{r.state ?? ""}</span> },
   { id: "victim_age", label: "Age", width: 44, defaultVisible: false, render: (r) => r.victim_age ?? "" },
   {
     id: "hazards", label: "Hazards (inferred)", width: 150, defaultVisible: true,

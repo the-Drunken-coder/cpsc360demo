@@ -4,6 +4,8 @@ import { useSelection } from "../session/SelectionProvider";
 import { useSession } from "../session/SessionProvider";
 import { useInvestigate } from "./InvestigateProvider";
 
+export const MAX_COMPARE_REPORTS = 50;
+
 export function compareHref(reportNos: string[]): string {
   const params = new URLSearchParams();
   reportNos.forEach((r) => params.append("r", r));
@@ -15,10 +17,11 @@ export function BulkActions({ reportNos, onClear, compact }: { reportNos: string
   const investigate = useInvestigate();
   const { canWrite } = useSession();
   const n = reportNos.length;
+  const canCompare = n >= 2 && n <= MAX_COMPARE_REPORTS;
   return (
     <ButtonGroup className="bulk-actions">
-      <Tooltip content="Compare side by side (c)" disabled={n >= 2}>
-        <Button small icon="comparison" text={compact ? undefined : "Compare"} disabled={n < 2}
+      <Tooltip content={n > MAX_COMPARE_REPORTS ? `Compare supports up to ${MAX_COMPARE_REPORTS} reports. Select fewer reports.` : "Select two or more reports to compare (c)."} disabled={canCompare}>
+        <Button small icon="comparison" text={compact ? undefined : "Compare"} disabled={!canCompare}
           onClick={() => navigate(compareHref(reportNos))} />
       </Tooltip>
       <Tooltip content={canWrite ? "Add to investigation (i)" : "Read-only viewer"}>

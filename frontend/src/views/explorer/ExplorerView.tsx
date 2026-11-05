@@ -7,7 +7,7 @@ import { api, qk } from "../../api/client";
 import type { IncidentSort } from "../../api/types";
 import { ActiveFilters } from "../../components/ActiveFilters";
 import { useInvestigate } from "../../components/InvestigateProvider";
-import { BulkActions, compareHref } from "../../components/SelectionBadge";
+import { BulkActions, compareHref, MAX_COMPARE_REPORTS } from "../../components/SelectionBadge";
 import { fmtCount } from "../../components/text";
 import { toSearchParams } from "../../domain/filters";
 import { toast, toastError } from "../../components/toaster";
@@ -61,7 +61,8 @@ export function ExplorerView() {
     open: () => { if (preview) navigate(`/incidents/${preview}`); },
     close: () => update({ preview: null }, true),
     compare: () => {
-      if (selection.selected.length >= 2) navigate(compareHref(selection.selected));
+      if (selection.selected.length > MAX_COMPARE_REPORTS) toast({ icon: "warning-sign", message: `Compare supports up to ${MAX_COMPARE_REPORTS} reports. Select fewer reports.` });
+      else if (selection.selected.length >= 2) navigate(compareHref(selection.selected));
       else toast({ icon: "info-sign", message: "Select two or more reports to compare (x toggles the focused row)." });
     },
     investigate: () => investigate.open(targets()),

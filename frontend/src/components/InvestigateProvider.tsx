@@ -98,7 +98,7 @@ function InvestigateDialog({ reportNos, onClose }: { reportNos: string[]; onClos
         </RadioGroup>
         {effectiveMode === "existing" ? (
           <FormGroup label="Investigation" labelFor="inv-target">
-            <HTMLSelect id="inv-target" fill value={target ?? ""} onChange={(e) => setTargetId(Number(e.currentTarget.value))}>
+            <HTMLSelect id="inv-target" autoFocus fill value={target ?? ""} onChange={(e) => setTargetId(Number(e.currentTarget.value))}>
               {candidates.map((i) => (
                 <option key={i.id} value={i.id}>#{i.id} {i.title} ({i.incident_count} reports, {i.status.replace("_", " ")})</option>
               ))}

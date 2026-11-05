@@ -1,7 +1,7 @@
 import { SettingsView } from "./views/settings/SettingsView";
-import { Alignment, Button, Classes, HotkeysProvider, Navbar, NavbarDivider, NavbarGroup, NavbarHeading, Tag } from "@blueprintjs/core";
-import { useState } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Alignment, Button, Classes, HotkeysProvider, KeyComboTag, Navbar, NavbarDivider, NavbarGroup, NavbarHeading, Tag } from "@blueprintjs/core";
+import { useEffect, useState } from "react";
+import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { InvestigateProvider } from "./components/InvestigateProvider";
 import { AppOmnibar } from "./components/AppOmnibar";
 import { UserSwitcher } from "./components/UserSwitcher";
@@ -17,6 +17,7 @@ import { InvestigationsList } from "./views/investigations/InvestigationsList";
 import { SourceView } from "./views/source/SourceView";
 import { SelectionBadge } from "./components/SelectionBadge";
 import { SourceStatusLine } from "./components/SourceStatusLine";
+import { rememberExplorerLocation } from "./navigation/explorerReturn";
 
 export function App() {
   return (
@@ -49,6 +50,10 @@ const NAV = [
 
 function Shell() {
   const [omnibarOpen, setOmnibarOpen] = useState(false);
+  const location = useLocation();
+  useEffect(() => {
+    rememberExplorerLocation(location.pathname, location.search);
+  }, [location.pathname, location.search]);
   useRegisteredHotkeys({ omnibar: () => setOmnibarOpen(true) });
   return (
     <div className="shell">
@@ -69,7 +74,7 @@ function Shell() {
           <NavbarDivider />
           <SelectionBadge />
           <Button minimal icon="search" onClick={() => setOmnibarOpen(true)} className="omnibar-trigger">
-            Jump to… <Tag minimal className="kbd">Ctrl K</Tag>
+            Jump to… <Tag minimal className="kbd"><KeyComboTag combo="mod+k" minimal /></Tag>
           </Button>
           <NavbarDivider />
           <UserSwitcher />

@@ -11,12 +11,9 @@ import { AnalystContext, CompanyComments, HazardEvidence, Narrative, Section } f
 import { RelatedList } from "./RelatedList";
 import { ReportedFields } from "./ReportedFields";
 import { SourceRecord } from "./SourceRecord";
+import { lastExplorerLocation } from "../../navigation/explorerReturn";
 
 type TabId = "report" | "related" | "source";
-
-function canGoBack(): boolean {
-  return ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0;
-}
 
 export function IncidentView() {
   const { reportNo = "", tab } = useParams();
@@ -37,7 +34,7 @@ export function IncidentView() {
     <div className="incident-view">
       <header className="incident-head">
         <Breadcrumbs items={[
-          { text: "Explorer", icon: "search-template", onClick: () => (canGoBack() ? navigate(-1) : navigate("/")) },
+          { text: "Explorer", icon: "search-template", onClick: () => navigate(lastExplorerLocation()) },
           { text: r.report_no },
         ]} />
         <div className="incident-title-row">

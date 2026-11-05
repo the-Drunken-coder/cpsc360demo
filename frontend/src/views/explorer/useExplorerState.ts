@@ -43,14 +43,19 @@ export function useExplorerState() {
   const state = useMemo(() => parseState(params), [params]);
 
   const update = useCallback((patch: Partial<ExplorerState>, replace = false) => {
-    setParams((prev) => serialize({ ...parseState(prev), ...patch }), { replace });
+    setParams((prev) => {
+      const current = parseState(prev);
+      const changesResults = patch.page !== undefined || patch.sort !== undefined || patch.filters !== undefined;
+      const preview = patch.preview !== undefined ? patch.preview : changesResults ? null : current.preview;
+      return serialize({ ...current, ...patch, preview });
+    }, { replace });
   }, [setParams]);
 
   const setFilters = useCallback((filters: Filters) => {
     setParams((prev) => {
       const cur = parseState(prev);
       const sort = cur.sort === "relevance" && !filters.q ? "report_date" : !cur.filters.q && filters.q ? "relevance" : cur.sort;
-      return serialize({ filters, sort, page: 1, preview: cur.preview });
+      return serialize({ filters, sort, page: 1, preview: null });
     });
   }, [setParams]);
 

@@ -5,7 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, qk } from "../../api/client";
 import type { AgreementField, IncidentDetail, PatternAnalysis } from "../../api/types";
 import { Provenance } from "../../components/Provenance";
-import { BulkActions } from "../../components/SelectionBadge";
+import { BulkActions, MAX_COMPARE_REPORTS } from "../../components/SelectionBadge";
 import { Highlighted, ReportLink } from "../../components/text";
 import { HAZARD_LABELS } from "../../domain/hazards";
 
@@ -50,13 +50,13 @@ export function CompareView() {
   const [params, setParams] = useSearchParams();
   const reportNos = [...new Set(params.getAll("r"))];
   const details = useQueries({
-    queries: reportNos.map((r) => ({ queryKey: qk.incident(r), queryFn: () => api.incident(r) })),
+    queries: reportNos.length <= MAX_COMPARE_REPORTS ? reportNos.map((r) => ({ queryKey: qk.incident(r), queryFn: () => api.incident(r) })) : [],
   });
   const sortedKey = [...reportNos].sort();
   const patterns = useQuery({
     queryKey: qk.patterns(sortedKey),
     queryFn: () => api.patterns(reportNos),
-    enabled: reportNos.length >= 2 && reportNos.length <= 50,
+    enabled: reportNos.length >= 2 && reportNos.length <= MAX_COMPARE_REPORTS,
   });
 
   const remove = (r: string) => {
@@ -69,7 +69,7 @@ export function CompareView() {
     return <NonIdealState icon="comparison" title="Compare reports"
       description="Select two or more reports in the explorer, related list, or an investigation, then press c." />;
   }
-  if (reportNos.length > 50) return <NonIdealState icon="error" title="Compare supports up to 50 reports" />;
+  if (reportNos.length > MAX_COMPARE_REPORTS) return <NonIdealState icon="error" title={`Compare supports up to ${MAX_COMPARE_REPORTS} reports`} />;
 
   const p = patterns.data;
   const loaded = details.map((q) => q.data);

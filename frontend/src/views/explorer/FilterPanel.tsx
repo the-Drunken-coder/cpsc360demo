@@ -1,9 +1,10 @@
 import { Button, Checkbox, Classes, Collapse, FormGroup, Icon, InputGroup, Switch, Tag } from "@blueprintjs/core";
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect, useState, type ClipboardEvent } from "react";
 import type { FacetField, FacetValue, Facets, Filters } from "../../api/types";
 import { fmtCount } from "../../components/text";
 import { toggleListValue, withFilter } from "../../domain/filters";
 import { FACET_ORDER, FILTER_LABELS } from "../../domain/labels";
+import { parsePastedDate } from "../../domain/pastedDate";
 import { SavedSearches } from "./SavedSearches";
 
 interface Props {
@@ -16,6 +17,13 @@ interface Props {
 export const FilterPanel = forwardRef<HTMLInputElement, Props>(function FilterPanel({ filters, sort, facets, onChange }, searchRef) {
   const [q, setQ] = useState(filters.q ?? "");
   useEffect(() => setQ(filters.q ?? ""), [filters.q]);
+  // Native date controls can emit paste without applying its text.
+  const pasteDate = (field: "report_date_from" | "report_date_to") => (event: ClipboardEvent<HTMLInputElement>) => {
+    const date = parsePastedDate(event.clipboardData.getData("text/plain"));
+    if (date === undefined) return;
+    event.preventDefault();
+    onChange(withFilter(filters, field, date));
+  };
 
   return (
     <aside className="filter-panel">
@@ -36,9 +44,11 @@ export const FilterPanel = forwardRef<HTMLInputElement, Props>(function FilterPa
           <div className="facet-title">Report date</div>
           <div className="date-range">
             <InputGroup small type="date" value={filters.report_date_from ?? ""} aria-label="Reported from"
+              onPaste={pasteDate("report_date_from")}
               onChange={(e) => onChange(withFilter(filters, "report_date_from", e.currentTarget.value))} />
             <span className={Classes.TEXT_MUTED}>to</span>
             <InputGroup small type="date" value={filters.report_date_to ?? ""} aria-label="Reported to"
+              onPaste={pasteDate("report_date_to")}
               onChange={(e) => onChange(withFilter(filters, "report_date_to", e.currentTarget.value))} />
           </div>
           <div className={`${Classes.TEXT_MUTED} facet-note`}>Submission date. Reports carry no incident date.</div>
