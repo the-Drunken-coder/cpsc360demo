@@ -420,7 +420,7 @@ async def put_go_setting(body: m.IntegrationInput, actor: Lead):
     with connection() as conn:
         conn.execute("SELECT pg_advisory_xact_lock(hashtext('opencode_go'))")
         before = integration(conn)
-        key = body.api_key if body.api_key is not None else before['api_key'] if before else None
+        key = body.api_key.strip() if body.api_key is not None else before['api_key'] if before else None
         model = body.model if body.model is not None else before['model'] if before else opencode_go.DEFAULT_MODEL
         row = conn.execute("INSERT INTO workspace.integration_setting (provider,api_key,model,updated_by) VALUES ('opencode_go',%s,%s,%s) ON CONFLICT (provider) DO UPDATE SET api_key=excluded.api_key,model=excluded.model,updated_by=excluded.updated_by,updated_at=now() RETURNING *", (key or None, model, actor.id)).fetchone()
         w.audit(conn, actor, 'integration.update', 'integration_setting', 'opencode_go',

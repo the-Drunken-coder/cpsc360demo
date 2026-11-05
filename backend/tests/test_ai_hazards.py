@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from cpsc360 import ai_hazards, opencode_go
 from cpsc360.app import app
 from cpsc360.search import connection
+from psycopg.types.json import Jsonb
 
 
 def test_evidence_validation():
@@ -29,6 +30,11 @@ def test_prompt_registry_and_verbatim_narrative():
     prompt = ai_hazards.messages(narrative)
     assert prompt[1]['content'] == narrative
     assert all(h.key in prompt[0]['content'] and h.label in prompt[0]['content'] for h in ai_hazards.HAZARDS)
+
+
+def restore(conn, table, row):
+    columns = ', '.join(row)
+    conn.execute(f'INSERT INTO {table} ({columns}) VALUES ({", ".join(["%s"] * len(row))})', tuple(row.values()))
 
 
 @pytest.fixture
@@ -65,13 +71,12 @@ def go_client(monkeypatch):
             yield client, headers, ids, state
     finally:
         with connection() as conn:
-            conn.execute("DELETE FROM inference.ai_hazard WHERE report_no=ANY(%s) AND model='test-chat'", (ids,))
-            for row in existing:
-                from psycopg.types.json import Jsonb
-                conn.execute('INSERT INTO inference.ai_hazard VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)', tuple(Jsonb(v) if k in ('hazards', 'dropped') else v for k, v in row.items()))
             conn.execute("DELETE FROM workspace.integration_setting WHERE provider='opencode_go'")
             if setting:
-                conn.execute('INSERT INTO workspace.integration_setting VALUES (%s,%s,%s,%s,%s)', tuple(setting.values()))
+                restore(conn, 'workspace.integration_setting', setting)
+            conn.execute("DELETE FROM inference.ai_hazard WHERE report_no=ANY(%s) AND model='test-chat'", (ids,))
+            for row in existing:
+                restore(conn, 'inference.ai_hazard', {k: Jsonb(v) if k in ('hazards', 'dropped') else v for k, v in row.items()})
             conn.execute("DELETE FROM workspace.audit_log WHERE id>%s AND entity='integration_setting'", (audit_start,))
 
 
@@ -165,3 +170,11 @@ def test_results_classified_against_an_older_source_version_are_stale():
     finally:
         with connection() as conn:
             conn.execute("DELETE FROM inference.ai_hazard WHERE model = '[test]-model'")
+
+
+def test_a_pasted_key_with_surrounding_whitespace_still_authenticates(go_client):
+    client, headers, ids, state = go_client
+    response = client.put('/api/settings/opencode-go', headers=headers['mchen'], json={'api_key': '  sk-private-test-key-ABCD\n', 'model': 'test-chat'})
+    assert response.json()['key_hint'] == 'ABCD'
+    results = client.post('/api/ai/hazards', headers=headers['jrivera'], json={'report_nos': ids[:1]}).json()
+    assert results[0]['status'] == 'ok', results
