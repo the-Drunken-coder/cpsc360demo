@@ -10,7 +10,6 @@ from typing import Annotated, Literal
 
 import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
-from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from psycopg.types.json import Jsonb
 
