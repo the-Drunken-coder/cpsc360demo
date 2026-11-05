@@ -250,3 +250,14 @@ def test_concentration_claims_quote_every_cited_spelling(client, headers, worksp
     snapshot = client.post(f"/api/investigations/{inv['id']}/summary", headers=headers['jrivera']).json()
     claim = next(c for s in snapshot['sections'] for c in s['claims'] if 'match on model' in c['text'])
     assert all(f'"{s}"' in claim['text'] for s in spellings)
+
+
+def test_manufacturer_claims_quote_reported_spellings(client, headers, workspace_cleanup):
+    ids = ['20111111-C576B-2147473411', '20260410-8290F-2147320766']
+    with connection() as conn:
+        spellings = {r['manufacturer_name'].strip() for r in conn.execute('SELECT manufacturer_name FROM source.incident WHERE report_no = ANY(%s)', (ids,))}
+    assert len(spellings) == 2
+    inv = client.post('/api/investigations', headers=headers['jrivera'], json={'title': '[test] maker spellings', 'report_nos': ids}).json()
+    snapshot = client.post(f"/api/investigations/{inv['id']}/summary", headers=headers['jrivera']).json()
+    claim = next(c for s in snapshot['sections'] for c in s['claims'] if 'match on manufacturer' in c['text'])
+    assert all(f'"{s}"' in claim['text'] for s in spellings)

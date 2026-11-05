@@ -86,6 +86,9 @@ HEADINGS = ['Scope', 'Severity', 'Hazard pattern', 'Product concentration', 'Nar
 SUMMARY_LABEL = 'Automated summary. Built only from the reports cited. Not an official CPSC finding.'
 
 
+REPORTED_FIELD = {'manufacturer_key': 'manufacturer_name', 'brand_key': 'brand', 'model_key': 'model'}
+
+
 def count(n, noun='report'):
     return f'{n} {noun}' if n == 1 else f'{n} {noun}s'
 
@@ -130,7 +133,8 @@ def generate_summary(conn, id, actor):
         by_report = {r['report_no']: r for r in rows}
         for field in analysis.field_agreement:
             if field.field in ['model_key', 'brand_key', 'manufacturer_key']:
-                noun, label_field = KEY_LABELS[field.field]
+                noun = KEY_LABELS[field.field][0]
+                label_field = REPORTED_FIELD[field.field]
                 for group in field.values:
                     if group.value and len(group.report_nos) >= 2:
                         spellings = sorted({(by_report[r][label_field] or '').strip() for r in group.report_nos} - {''}, key=str.lower)

@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass
 
-NORM_METHOD = "keys-v2"
+NORM_METHOD = "keys-v3"
 GENERIC_MODEL_MANUFACTURERS = 5
 HAZARD_METHOD = "hazard-rules-v2"
 
@@ -14,6 +14,14 @@ _PLACEHOLDERS = {
     "idonotknow", "donotknow", "unavailable", "notprovided", "noneprovided", "nonelisted",
     "seeabove", "seebelow", "seephoto", "seephotos", "seepicture", "seepictures", "vinredacted",
 }
+# Non-answers ("None found", "unknown at this time", "IMEI [REDACTED]") take endless spellings, so a model
+# with no digits that contains one of these words is treated as a placeholder rather than listed one by one.
+_NON_ANSWER = re.compile(
+    r"\b(?:unknown|unk|none|n/?a|redacted|unavailable|idk|no idea|not (?:sure|known|available|provided|listed|"
+    r"applicable|shown|found|visible)|(?:don'?t|do not|dont) know|see (?:above|below|photos?|pictures?|attached|description))\b",
+    re.IGNORECASE,
+)
+
 _MFR_SUFFIXES = {
     "inc", "incorporated", "corp", "corporation", "co", "company", "llc", "ltd", "limited",
     "lp", "llp", "plc", "the", "usa", "us", "america", "americas", "na", "intl", "international",
@@ -47,7 +55,11 @@ def model_key(model: str | None) -> str | None:
     ingest.rebuild_inference also drops keys reported for many manufacturers, since those identify nothing.
     """
     key = _alnum(model or "")
-    return key if len(key) >= 2 and key not in _PLACEHOLDERS else None
+    if len(key) < 2 or key in _PLACEHOLDERS:
+        return None
+    if _NON_ANSWER.search(model or "") and not any(c.isdigit() for c in key):
+        return None
+    return key
 
 
 @dataclass(frozen=True)

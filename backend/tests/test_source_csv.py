@@ -49,6 +49,10 @@ def test_placeholder_models_never_match():
     assert model_key("WRF-555 SDFZ") == "wrf555sdfz"
     assert model_key("GT") == "gt"
     assert model_key("See photos") is None
+    assert model_key("None found") is None
+    assert model_key("IMEI [REDACTED]") is None
+    assert model_key("Polaris RZR 800 [REDACTED]") == "polarisrzr800redacted"
+    assert model_key("HP OmniStudio All-in-One X27") == "hpomnistudioallinonex27"
 
 
 def test_hazard_tags_keep_the_matched_phrases():
