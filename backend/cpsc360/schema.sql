@@ -232,3 +232,25 @@ CREATE TABLE IF NOT EXISTS workspace.audit_log (
     after      jsonb
 );
 CREATE INDEX IF NOT EXISTS audit_log_entity_idx ON workspace.audit_log (entity, entity_id, at DESC);
+
+CREATE TABLE IF NOT EXISTS workspace.integration_setting (
+    provider text PRIMARY KEY CHECK (provider = 'opencode_go'),
+    api_key text,
+    model text NOT NULL,
+    updated_by bigint REFERENCES workspace.app_user(id),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS inference.ai_hazard (
+    report_no text REFERENCES source.incident(report_no),
+    model text NOT NULL,
+    prompt_version text NOT NULL,
+    status text NOT NULL CHECK (status IN ('ok', 'error')),
+    hazards jsonb NOT NULL,
+    dropped jsonb NOT NULL,
+    raw_response text,
+    error text,
+    classified_by bigint REFERENCES workspace.app_user(id),
+    classified_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (report_no, model)
+);

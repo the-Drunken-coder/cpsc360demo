@@ -293,3 +293,28 @@ interface Spike { key: string; label: string; recent_count: number; expected_cou
 ## Errors
 
 `{detail: string}` with a 4xx status. `422` for validation (FastAPI default shape is fine).
+
+## OpenCode Go settings and AI hazards
+
+- `GET /api/settings/opencode-go` requires any authenticated user. Returns `{configured: boolean, key_hint: string|null, model: string, updated_by: User|null, updated_at: string|null}`. The hint contains only the last four key characters.
+- `PUT /api/settings/opencode-go` requires a lead. Accepts `{api_key?: string, model?: string}`. Omitted fields retain their values. An empty key clears it. Models must support chat completions. Returns the same safe settings shape. Audit records contain only `api_key: "set"` or `"cleared"` and the model.
+- `GET /api/settings/opencode-go/models` requires any authenticated user. Returns live chat-completions model IDs, cached for ten minutes.
+- `POST /api/ai/hazards` requires an analyst or lead. Accepts `{report_nos: string[]}` with 1 to 50 entries. Duplicate report numbers are classified once. Processes at most six reports concurrently and upserts each result by report and model. Returns `AIHazardResult[]`. Returns `409` when no key is configured, `404` when any report is missing, and `502` with the upstream message for upstream authentication or rate-limit errors. Malformed model output and other upstream failures are stored as per-report errors.
+
+```ts
+interface AIHazardResult {
+  report_no: string;
+  model: string;
+  prompt_version: string;
+  status: "ok" | "error";
+  hazards: { hazard: HazardKey; label: string; evidence: string[] }[];
+  dropped: { claim: unknown; reason: string }[];
+  error: string | null;
+  classified_by: User | null;
+  classified_at: string;
+}
+```
+
+`IncidentDetail.inferred.ai_hazards` contains these results, newest first. These are AI-generated inferences, not reported facts or CPSC findings. `ai-hazards-v1` uses the hazard registry and the verbatim narrative. Only registered hazards with evidence quotes found in that narrative survive validation. Quote comparison ignores case and normalizes whitespace. Each rejected claim or quote carries a reason. Fenced JSON is accepted. The server retains the raw response for inspection in the database. It never returns it through the API.
+
+The server stores the API key and never returns it. The default model is `deepseek-v4.1-flash`. `CPSC360_OPENCODE_GO_BASE_URL` overrides `https://opencode.ai/inference/go` for local verification. Chat requests include a stable `x-opencode-session` scoped to the acting user. Keys are stored in the prototype database as text, so database access must remain restricted. The frontend's optional `CPSC360_API_URL` selects its development proxy target.
