@@ -84,7 +84,7 @@ def load(rows: list[SourceRow], kind: str, source_url: str, params: dict, file_s
             "kept_bulk": len(changed) - len(applied),
         }
         cur.execute(
-            "UPDATE source.ingest_batch SET finished_at = now(), row_count = %(row_count)s, inserted = %(inserted)s, "
+            "UPDATE source.ingest_batch SET finished_at = clock_timestamp(), row_count = %(row_count)s, inserted = %(inserted)s, "
             "updated = %(updated)s, unchanged = %(unchanged)s, kept_bulk = %(kept_bulk)s WHERE id = %(id)s",
             {**stats, "id": batch_id},
         )
