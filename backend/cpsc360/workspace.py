@@ -70,9 +70,12 @@ def patterns(conn, ids):
     for field in ['manufacturer_key', 'brand_key', 'model_key', 'product_code', 'product_category', 'state', 'severity']:
         groups = defaultdict(list)
         for row in rows:
-            groups[row[field]].append(row['report_no'])
+            value = row[field]
+            if field == 'model_key' and value is not None:
+                value = f"{row['manufacturer_key']}/{value}"
+            groups[value].append(row['report_no'])
         label_field = KEY_LABELS.get(field, (None, field))[1]
-        labels = {row[field]: row[label_field] or row[field] for row in rows}
+        labels = {(f"{row['manufacturer_key']}/{row[field]}" if field == 'model_key' and row[field] else row[field]): row[label_field] or row[field] for row in rows}
         agreements.append({'field': field, 'values': [{'value': value, 'label': labels[value] or 'Not reported', 'report_nos': group} for value, group in sorted(groups.items(), key=lambda p: (-len(p[1]), p[0] or ''))]})
     hazards, severities = defaultdict(list), defaultdict(list)
     for row in rows:

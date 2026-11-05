@@ -165,7 +165,7 @@ def related(report_no: str, actor: Auth, limit: int = Query(25, ge=1, le=200)):
         origin = reports(conn, [report_no])[0]
         candidates = set(index.neighbors(report_no))
         if origin['model_key']:
-            candidates.update(r['report_no'] for r in conn.execute('SELECT report_no FROM inference.incident_norm WHERE model_key=%s ORDER BY report_no LIMIT 200', (origin['model_key'],)))
+            candidates.update(r['report_no'] for r in conn.execute('SELECT report_no FROM inference.incident_norm WHERE model_key=%s AND manufacturer_key=%s ORDER BY report_no LIMIT 200', (origin['model_key'], origin['manufacturer_key'])))
         candidates.update(r['report_no'] for r in conn.execute('SELECT report_no FROM source.incident WHERE report_no=ANY(%s) OR %s=ANY(associated_report_nos)', (origin['associated_report_nos'], report_no)))
         review_rows = conn.execute('SELECT * FROM workspace.relation_review WHERE report_a=%s OR report_b=%s', (report_no, report_no)).fetchall()
         reviews = {r['report_b'] if r['report_a'] == report_no else r['report_a']: w.review(conn, r) for r in review_rows}

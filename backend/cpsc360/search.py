@@ -48,9 +48,15 @@ def filters_sql(filters: Filters, omit: str | None = None):
         clauses.append('EXISTS (SELECT 1 FROM inference.incident_hazard h WHERE h.report_no=i.report_no AND h.hazard=%s)')
         args.append(hazard)
     for field in ['brand', 'model']:
-        if getattr(filters, field) is not None:
+        value = getattr(filters, field)
+        if value is None:
+            continue
+        if derive.match_text(value):
             clauses.append(f"regexp_replace(lower(coalesce(i.{field}, '')), '[^a-z0-9]', '', 'g') = %s")
-            args.append(derive.match_text(getattr(filters, field)))
+            args.append(derive.match_text(value))
+        else:
+            clauses.append(f"lower(btrim(i.{field})) = %s")
+            args.append(value.strip().lower())
     if filters.q:
         clauses.append("i.search @@ websearch_to_tsquery('english', %s)")
         args.append(filters.q)
@@ -165,7 +171,9 @@ def pair_reasons(a, b):
         reasons.append(Reason(kind=kind, weight=REASON_WEIGHTS[kind] * multiplier, detail=detail, **extra))
     if b['report_no'] in a['associated_report_nos'] or a['report_no'] in b['associated_report_nos']:
         add('associated_report', 'The published reports explicitly associate this pair.')
-    for field, kind in [('model_key', 'same_model'), ('manufacturer_key', 'same_manufacturer'), ('brand_key', 'same_brand'), ('product_code', 'same_product_type')]:
+    if a['model_key'] is not None and (a['model_key'], a['manufacturer_key']) == (b['model_key'], b['manufacturer_key']):
+        add('same_model', f"Same model from the same manufacturer: {a['model'].strip()}")
+    for field, kind in [('manufacturer_key', 'same_manufacturer'), ('brand_key', 'same_brand'), ('product_code', 'same_product_type')]:
         if a[field] is not None and a[field] == b[field]:
             noun, label_field = KEY_LABELS[field]
             add(kind, f'Same {noun}: {a[label_field] or a[field]}')

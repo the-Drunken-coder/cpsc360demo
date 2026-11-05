@@ -71,8 +71,8 @@ interface Filters {
   product_category?: string[];
   product_code?: string[];
   manufacturer_key?: string[];
-  brand?: string;                  // case-insensitive equality on brand_key
-  model?: string;                  // case-insensitive equality on model_key
+  brand?: string;                  // reported brand equals this, comparing letters and digits only, case-insensitive
+  model?: string;                  // same rule for the reported model; a value with no letters or digits matches exactly
   hazard?: HazardKey[];
   hazard_all?: HazardKey[];        // every listed hazard must be present (AND), on top of `hazard`
   severity?: string[];
@@ -176,7 +176,7 @@ Scoring `related-v1` is additive and fixed, so every score can be recomputed by 
 | kind | weight | condition |
 | --- | --- | --- |
 | `associated_report` | 0.50 | either report lists the other in Associated Report Numbers |
-| `same_model` | 0.35 | equal non-null `model_key` |
+| `same_model` | 0.35 | equal non-null `model_key` and equal `manufacturer_key` (a model number only identifies a product within its maker) |
 | `text_similarity` | 0.40 x cosine | TF-IDF cosine of narrative + product description, shown when cosine >= 0.12 |
 | `same_manufacturer` | 0.10 | equal `manufacturer_key` |
 | `same_brand` | 0.05 | equal non-null `brand_key` |

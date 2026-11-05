@@ -39,7 +39,7 @@ export function Linkified({ body }: { body: string }) {
 
 export function termPattern(terms: string[]): RegExp {
   const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  return new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
+  return new RegExp(`(?<![\\p{L}\\p{N}_])(${escaped.join("|")})(?![\\p{L}\\p{N}_])`, "giu");
 }
 
 export function Highlighted({ text, terms }: { text: string; terms: string[] }) {

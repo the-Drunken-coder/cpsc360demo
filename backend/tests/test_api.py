@@ -201,15 +201,18 @@ def test_search_snippets_are_verbatim_excerpts_of_the_narrative(client, headers)
             assert ' '.join(excerpt.split()) in ' '.join(narratives[item['report_no']].split()), item['report_no']
 
 
-def test_short_models_filter_and_generic_models_never_link(client, headers):
+def test_short_models_filter_and_same_model_needs_the_same_maker(client, headers):
     with connection() as conn:
         stored = conn.execute("SELECT count(*) n FROM source.incident WHERE model='GT'").fetchone()['n']
-        generic = conn.execute("SELECT count(*) n FROM inference.incident_norm WHERE model_key IN ('idonotknow','seeabove','unknown','classic')").fetchone()['n']
-        origin = conn.execute("SELECT report_no FROM source.incident WHERE model ILIKE 'I do not know' LIMIT 1").fetchone()['report_no']
+        question = conn.execute("SELECT count(*) n FROM source.incident WHERE btrim(model)='?'").fetchone()['n']
     assert stored > 0 and get(client, headers, '/api/incidents?model=GT')['total'] == stored
-    assert generic == 0
-    related = get(client, headers, f'/api/incidents/{origin}/related')
-    assert not any(r['kind'] == 'same_model' for item in related for r in item['reasons'])
+    assert get(client, headers, '/api/incidents', params={'model': '?'})['total'] == question
+    for origin in ['20221114-11FCC-3978060', '20160302-1C3BE-1558847']:
+        maker = get(client, headers, f'/api/incidents/{origin}')['inferred']['manufacturer_key']
+        related = get(client, headers, f'/api/incidents/{origin}/related', params={'limit': 200})
+        assert all(item['incident']['manufacturer_key'] == maker for item in related if any(r['kind'] == 'same_model' for r in item['reasons']))
+    gt = get(client, headers, '/api/incidents?model=GT&page_size=2')['items']
+    assert any(r['kind'] == 'same_model' for item in get(client, headers, f"/api/incidents/{gt[0]['report_no']}/related", params={'limit': 200}) for r in item['reasons'])
 
 
 def test_hazard_drilldown_filter_matches_breakdown_count(client, headers):

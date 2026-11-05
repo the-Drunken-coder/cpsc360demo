@@ -155,12 +155,6 @@ def rebuild_inference() -> dict:
             norm.append((report_no, key, derive.brand_key(brand), derive.model_key(model), derive.NORM_METHOD))
             for hazard, evidence in derive.tag_hazards(narrative).items():
                 hazards.append((report_no, hazard, evidence, derive.HAZARD_METHOD))
-        makers: dict[str, set[str]] = collections.defaultdict(set)
-        for _, maker, _, model, _ in norm:
-            if model:
-                makers[model].add(maker)
-        generic = {model for model, owners in makers.items() if len(owners) >= derive.GENERIC_MODEL_MANUFACTURERS}
-        norm = [(r, m, b, None if model in generic else model, method) for r, m, b, model, method in norm]
         cur.execute("TRUNCATE inference.incident_norm, inference.incident_hazard, inference.manufacturer")
         cur.executemany("INSERT INTO inference.incident_norm VALUES (%s, %s, %s, %s, %s)", norm)
         cur.executemany("INSERT INTO inference.incident_hazard VALUES (%s, %s, %s, %s)", hazards)

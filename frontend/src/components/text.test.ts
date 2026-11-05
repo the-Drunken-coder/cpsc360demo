@@ -11,3 +11,14 @@ describe("evidence highlighting", () => {
     expect([..."The unit CAUGHT FIRE twice".matchAll(termPattern(["caught fire"]))].map((m) => m[0])).toEqual(["CAUGHT FIRE"]);
   });
 });
+
+describe("evidence highlighting with accented words", () => {
+  it("marks terms that end in a non-ASCII letter", () => {
+    const text = "My GE Café range and the café oven";
+    expect([...text.matchAll(termPattern(["ge café", "café"]))].map((m) => m[0])).toEqual(["GE Café", "café"]);
+  });
+
+  it("does not mark a term inside a longer accented word", () => {
+    expect([..."cafés".matchAll(termPattern(["café"]))].map((m) => m[0])).toEqual([]);
+  });
+});

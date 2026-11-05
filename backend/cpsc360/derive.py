@@ -3,8 +3,7 @@
 import re
 from dataclasses import dataclass
 
-NORM_METHOD = "keys-v3"
-GENERIC_MODEL_MANUFACTURERS = 5
+NORM_METHOD = "keys-v4"
 HAZARD_METHOD = "hazard-rules-v2"
 
 _PLACEHOLDERS = {
@@ -52,7 +51,8 @@ def brand_key(brand: str | None) -> str | None:
 def model_key(model: str | None) -> str | None:
     """Model numbers compare on letters and digits only. Placeholders and single characters never match.
 
-    ingest.rebuild_inference also drops keys reported for many manufacturers, since those identify nothing.
+    A model number only identifies a product within its manufacturer, so matching pairs this key with
+    manufacturer_key; on its own, "X1" or "20" names products from unrelated makers.
     """
     key = _alnum(model or "")
     if len(key) < 2 or key in _PLACEHOLDERS:
