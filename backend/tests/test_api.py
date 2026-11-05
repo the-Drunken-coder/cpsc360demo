@@ -246,7 +246,7 @@ def test_trend_other_counts_reports_not_hazard_tags(client, headers):
 
 def test_concentration_claims_quote_every_cited_spelling(client, headers, workspace_cleanup):
     with connection() as conn:
-        rows = conn.execute("SELECT i.report_no, i.model FROM source.incident i JOIN inference.incident_norm n USING (report_no) WHERE n.model_key = 'shapeups' ORDER BY i.model LIMIT 12").fetchall()
+        rows = conn.execute("SELECT i.report_no, i.model FROM source.incident i JOIN inference.incident_norm n USING (report_no) WHERE n.model_key = 'shapeups' AND n.manufacturer_key = (SELECT manufacturer_key FROM inference.incident_norm WHERE model_key = 'shapeups' GROUP BY 1 ORDER BY count(*) DESC LIMIT 1)").fetchall()
     spellings = {r['model'].strip() for r in rows}
     assert len(spellings) >= 2
     inv = client.post('/api/investigations', headers=headers['jrivera'], json={'title': '[test] spellings', 'report_nos': [r['report_no'] for r in rows]}).json()

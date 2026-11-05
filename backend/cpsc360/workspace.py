@@ -142,7 +142,7 @@ def generate_summary(conn, id, actor):
                     if group.value and len(group.report_nos) >= 2:
                         spellings = sorted({(by_report[r][label_field] or '').strip() for r in group.report_nos} - {''}, key=str.lower)
                         named.extend(spellings)
-                        shown = ', '.join(f'"{s}"' for s in spellings[:4]) + (f' and {len(spellings) - 4} more' if len(spellings) > 4 else '')
+                        shown = ', '.join(f'"{s}"' for s in spellings)
                         claim('Product concentration', f'{count(len(group.report_nos))} match on {noun}, reported as {shown}.', group.report_nos)
         for term in theme_terms(analysis.shared_terms, named):
             claim('Narrative themes', f'"{term.term}" appears in {count(len(term.report_nos))}.', term.report_nos)
