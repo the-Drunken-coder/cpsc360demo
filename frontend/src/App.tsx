@@ -40,11 +40,11 @@ export function App() {
 }
 
 const NAV = [
-  { to: "/settings", label: "Settings", icon: "cog", end: false },
   { to: "/", label: "Explorer", icon: "search-template", end: true },
   { to: "/analytics", label: "Analytics", icon: "timeline-bar-chart", end: false },
   { to: "/investigations", label: "Investigations", icon: "folder-shared", end: false },
   { to: "/source", label: "Source", icon: "database", end: false },
+  { to: "/settings", label: "Settings", icon: "cog", end: false },
 ] as const;
 
 function Shell() {
