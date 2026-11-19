@@ -74,3 +74,5 @@ cd frontend && npm test && npm run build
 - `backend/cpsc360/app.py` serves the API. `search.py` holds the shared filter builder and text index, and `workspace.py` holds investigations, patterns, and summaries.
 - `frontend/src` is React, TypeScript, and Blueprint, organized by view.
 - `docs/api.md` is the API contract. `docs/data-source.md` records how SaferProducts.gov publishes its data. `docs/decisions.tsv` logs the build decisions.
+
+Historical recall replays trace public complaints to later CPSC actions and compare early-warning rules and review volumes. [Recall replay findings](docs/recall-early-warning.md)
