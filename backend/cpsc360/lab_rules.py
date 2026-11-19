@@ -7,8 +7,10 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-ActionKind = Literal['tag', 'route', 'copy', 'escalate', 'priority', 'disposition', 'suppress', 'audit']
-Group = Literal['product', 'hazard', 'manufacturer', 'make_model', 'manufacturer_hazard']
+CaseActionKind = Literal['nfa', 'watchlist', 'idi', 'compliance', 'compliance_other', 'standards_work',
+                         'ipt_discussion', 'reject', 'forward']
+LegacyActionKind = Literal['tag', 'route', 'copy', 'escalate', 'priority', 'disposition', 'suppress', 'audit']
+Group = Literal['product', 'hazard', 'product_hazard', 'manufacturer', 'make_model', 'manufacturer_hazard']
 TextField = Literal['narrative', 'product', 'hazard', 'manufacturer', 'model', 'jurisdiction', 'body_area', 'retailer']
 NumberField = Literal['age', 'tbsa', 'burn_depth', 'people_injured']
 FlagField = Literal['injury', 'hospitalized', 'death', 'contact_available', 'sample_available',
@@ -105,8 +107,12 @@ Condition = Annotated[TextCondition | NumberCondition | FlagCondition | CountCon
                       Field(discriminator='kind')]
 
 
-class Action(Config):
-    kind: ActionKind
+class CaseAction(Config):
+    kind: CaseActionKind
+
+
+class LegacyAction(Config):
+    kind: LegacyActionKind
     value: str = Field(min_length=1, max_length=80)
 
     @model_validator(mode='after')
@@ -119,12 +125,15 @@ class Action(Config):
         return self
 
 
-class Rule(Config):
+Action = Annotated[CaseAction | LegacyAction, Field(discriminator='kind')]
+
+
+class Rule[ActionT: Action](Config):
     name: str = Field(min_length=1, max_length=80)
     match: Literal['all', 'any']
     trigger: Literal['arrival', 'end'] = 'arrival'
     conditions: list[Condition] = Field(min_length=1, max_length=12)
-    action: Action
+    action: ActionT
 
     @model_validator(mode='after')
     def validate_trigger(self):
@@ -149,7 +158,8 @@ def terms(value: str) -> list[str]:
 
 
 def group_key(facts: dict, group: Group) -> tuple:
-    fields = {'make_model': ('manufacturer', 'model'), 'manufacturer_hazard': ('manufacturer', 'hazard')}.get(group, (group,))
+    fields = {'product_hazard': ('product', 'hazard'), 'make_model': ('manufacturer', 'model'),
+              'manufacturer_hazard': ('manufacturer', 'hazard')}.get(group, (group,))
     return tuple(facts.get(field) for field in fields)
 
 
@@ -221,13 +231,14 @@ def apply_rules(rules: list[Rule], facts: dict, previous: list[dict], day: date,
         if evidence and (rule.match == 'any' or len(evidence) == len(rule.conditions)):
             result.append(Match(rule=rule.name, action=rule.action, evidence=evidence))
     suppressed = {':'.join(part.strip() for part in item.action.value.casefold().split(':', 1))
-                  for item in result if item.action.kind == 'suppress'}
+                  for item in result if isinstance(item.action, LegacyAction) and item.action.kind == 'suppress'}
     disposition_chosen = False
     for item in result:
-        kind = item.action.kind
-        if kind != 'suppress' and (kind in suppressed or f'{kind}:{item.action.value.casefold()}' in suppressed):
-            item.applied = False
-        if kind == 'disposition' and item.applied:
+        action = item.action
+        if isinstance(action, LegacyAction) and action.kind != 'suppress':
+            if action.kind in suppressed or f'{action.kind}:{action.value.casefold()}' in suppressed:
+                item.applied = False
+        if item.applied and (isinstance(action, CaseAction) or action.kind == 'disposition'):
             item.applied = not disposition_chosen
             disposition_chosen = True
     return result

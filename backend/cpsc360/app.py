@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import JSONResponse
 from psycopg.types.json import Jsonb
 
-from . import ai_hazards, opencode_go, analytics, heuristic_lab as lab, ingest, models as m, workspace as w
+from . import ai_hazards, opencode_go, analytics, heuristic_lab as lab, ingest, lab_rules, models as m, workspace as w
 from .derive import HAZARD_LABELS
 from .search import FACETS, JOIN, connection, filters_sql, index, pair_reasons, reports, summaries, summary
 from .source_csv import COLUMNS, INCIDENT_COLUMNS
@@ -519,7 +519,7 @@ def get_lab_run(id: int, actor: Auth):
 
 
 @app.post('/api/heuristic-lab/runs', status_code=201, response_model=lab.SavedRun)
-def create_lab_run(body: lab.RunInput, actor: Writer):
+def create_lab_run(body: lab.RunInput[lab_rules.CaseAction], actor: Writer):
     result = lab.replay(body).model_dump(mode='json')
     with connection() as conn:
         row = conn.execute('INSERT INTO workspace.heuristic_run (actor_id,result) VALUES (%s,%s) RETURNING *',
@@ -527,23 +527,3 @@ def create_lab_run(body: lab.RunInput, actor: Writer):
         w.audit(conn, actor, 'heuristic_run.create', 'heuristic_run', row['id'],
                 after={key: result[key] for key in ('scenario', 'evaluator', 'start', 'end')})
         return lab_saved(row)
-
-
-@app.post('/api/heuristic-lab/runs/{id}/advice', response_model=lab.Advice)
-async def lab_advice(id: int, actor: Writer):
-    with connection() as conn:
-        run = lab_saved(find_lab_run(conn, id, actor)).result
-        setting = integration(conn)
-    if not setting or not setting['api_key']:
-        raise HTTPException(409, 'Configure an OpenCode Go API key in Settings first.')
-    if run.scenario != lab.SCENARIO or run.evaluator != lab.EVALUATOR:
-        raise HTTPException(409, 'Create a run with the current scenario and evaluator before requesting advice.')
-    try:
-        raw = await opencode_go.chat_complete(
-            setting['api_key'], setting['model'], lab.advice_messages(run), f'cpsc360-lab-{actor.id}'
-        )
-        return lab.score_advice(raw.replace(setting['api_key'], '[redacted]'), setting['model'], run)
-    except opencode_go.UpstreamError as exc:
-        raise HTTPException(502, 'OpenCode Go could not generate advice.') from exc
-    except ValueError as exc:
-        raise HTTPException(502, 'OpenCode Go did not return a valid single-change proposal. Try again.') from exc

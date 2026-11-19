@@ -16,9 +16,9 @@ This is a prototype. It uses public data only, it has no connection to internal 
 6. **Summary.** A generated summary where every claim lists the reports it counts. It is built from a template, so it cannot cite a report it did not use.
 7. **Analytics.** Trends by product, manufacturer, hazard, or severity, a breakdown, and a table of unusual increases. Every bar, point, and row opens the exact reports behind it.
 
-8. **Heuristic Lab.** Preview a labeled synthetic scenario at a chosen date, configure two rule sets, and replay three calendar months. Saved runs compare catches, misses, background alerts, and detection delay with evidence for each case. With OpenCode Go configured, request one candidate change and see how it performs on a separate synthetic dataset.
+8. **Heuristic Lab.** Preview a synthetic scenario at a chosen date, configure two sets of triage rules, and replay three calendar months. Saved runs compare recommended case actions and show the evidence behind each rule match.
 
-In the Heuristic Lab, **Add triage rule** combines all or any conditions and recommends a tag, queue, escalation, priority, disposition, or audit. Each match includes its evidence. Suppressions apply before dispositions are selected, and the first remaining disposition wins. End-of-replay checks can use time without new reports. The lab simulates recommendations on synthetic data, and actions have no external effect.
+In the Heuristic Lab, **Add a rule** combines conditions to recommend a case action such as an in-depth investigation or IPT discussion. When several rules match a report at the same time, the first match supplies the recommendation. Results include evidence for all matches. End-of-replay checks can use time without new reports. The lab simulates recommendations on synthetic data, and actions have no external effect.
 
 Every value carries its provenance:
 
