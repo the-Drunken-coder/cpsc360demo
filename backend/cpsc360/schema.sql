@@ -256,3 +256,11 @@ CREATE TABLE IF NOT EXISTS inference.ai_hazard (
 );
 -- The source version the model read; a result is stale once the report's current version differs.
 ALTER TABLE inference.ai_hazard ADD COLUMN IF NOT EXISTS source_sha256 text;
+
+CREATE TABLE IF NOT EXISTS workspace.heuristic_run (
+    id bigserial PRIMARY KEY,
+    actor_id bigint NOT NULL REFERENCES workspace.app_user(id),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    result jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS heuristic_run_actor_idx ON workspace.heuristic_run (actor_id, id DESC);

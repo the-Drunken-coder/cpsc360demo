@@ -18,6 +18,7 @@ type Item =
 const VIEWS: Item[] = [
   { kind: "view", label: "Explorer", to: "/", icon: "search-template" },
   { kind: "view", label: "Analytics", to: "/analytics", icon: "timeline-bar-chart" },
+  { kind: "view", label: "Heuristic Lab", to: "/heuristic-lab", icon: "lab-test" },
   { kind: "view", label: "Investigations", to: "/investigations", icon: "folder-shared" },
   { kind: "view", label: "Source and sync status", to: "/source", icon: "database" },
 ];

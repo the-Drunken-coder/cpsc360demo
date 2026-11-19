@@ -16,6 +16,10 @@ This is a prototype. It uses public data only, it has no connection to internal 
 6. **Summary.** A generated summary where every claim lists the reports it counts. It is built from a template, so it cannot cite a report it did not use.
 7. **Analytics.** Trends by product, manufacturer, hazard, or severity, a breakdown, and a table of unusual increases. Every bar, point, and row opens the exact reports behind it.
 
+8. **Heuristic Lab.** Preview a labeled synthetic scenario at a chosen date, configure two rule sets, and replay three calendar months. Saved runs compare catches, misses, background alerts, and detection delay with evidence for each case. With OpenCode Go configured, request one candidate change and see how it performs on a separate synthetic dataset.
+
+In the Heuristic Lab, **Add triage rule** combines all or any conditions and recommends a tag, queue, escalation, priority, disposition, or audit. Each match includes its evidence. Suppressions apply before dispositions are selected, and the first remaining disposition wins. End-of-replay checks can use time without new reports. The lab simulates recommendations on synthetic data, and actions have no external effect.
+
 Every value carries its provenance:
 
 | Tier | Meaning |
@@ -41,6 +45,8 @@ cd ..
 scripts/dev-api.sh                                  # API on 127.0.0.1:8000; the first start builds the text index (~1 min)
 cd frontend && npm ci && npm run dev                # UI on http://localhost:5173
 ```
+
+For an existing database, rerun `.venv/bin/python -m cpsc360.ingest init-db` from `backend` to add the Heuristic Lab table.
 
 Ingestion commands are idempotent. Rerunning `bulk` or `sync` over the same data changes nothing.
 

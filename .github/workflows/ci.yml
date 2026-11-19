@@ -40,5 +40,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e '.[dev]'
-      # The API tests need the loaded SaferProducts.gov database; CI runs the parser and derivation tests.
-      - run: pytest -q tests/test_source_csv.py
+      # The API tests need the loaded SaferProducts.gov database.
+      - run: pytest -q tests/test_source_csv.py tests/test_heuristic_lab.py
