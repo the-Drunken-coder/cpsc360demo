@@ -68,13 +68,7 @@ def to_report(row: dict) -> lab.Report:
     )
 
 
-def replay(conn, request: lab.RunInput[lab_rules.CaseAction]) -> lab.RunResult:
-    first, last = bounds(conn)
-    validate_start(request.start, first, last)
-    end = lab.end_date(request.start)
-    lookback = max((condition.window_days for rule in (*request.baseline.triage, *request.candidate.triage)
-                    for condition in rule.conditions if isinstance(condition, lab_rules.CountCondition)), default=1)
-    earliest = max(first + ONE_DAY, request.start + timedelta(days=2 - lookback))
+def load_reports(conn, earliest: date, end: date) -> list[lab.Report]:
     rows = conn.execute('''
         SELECT i.report_no, i.publication_date, i.current_sha256, i.product_type, i.product_description,
                i.product_code, i.incident_description, i.severity, i.victim_age, i.manufacturer_name, i.brand, i.model, i.retailer,
@@ -86,7 +80,17 @@ def replay(conn, request: lab.RunInput[lab_rules.CaseAction]) -> lab.RunResult:
          WHERE i.publication_date BETWEEN %s AND %s
          ORDER BY i.publication_date, i.report_no
     ''', (earliest, end)).fetchall()
-    reports = [to_report(row) for row in rows]
+    return [to_report(row) for row in rows]
+
+
+def replay(conn, request: lab.RunInput[lab_rules.CaseAction]) -> lab.RunResult:
+    first, last = bounds(conn)
+    validate_start(request.start, first, last)
+    end = lab.end_date(request.start)
+    lookback = max((condition.window_days for rule in (*request.baseline.triage, *request.candidate.triage)
+                    for condition in rule.conditions if isinstance(condition, lab_rules.CountCondition)), default=1)
+    earliest = max(first + ONE_DAY, request.start + timedelta(days=2 - lookback))
+    reports = load_reports(conn, earliest, end)
     cases = tuple(lab.Case(id=report.id, title=report.product, reports=(report,)) for report in reports)
     return lab.RunResult(
         scenario=VERSION, evaluator=lab.EVALUATOR, source='public', start=request.start, end=end, starting_reports=[],
