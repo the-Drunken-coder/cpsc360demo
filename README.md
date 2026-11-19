@@ -16,9 +16,9 @@ This is a prototype. It uses public data only, it has no connection to internal 
 6. **Summary.** A generated summary where every claim lists the reports it counts. It is built from a template, so it cannot cite a report it did not use.
 7. **Analytics.** Trends by product, manufacturer, hazard, or severity, a breakdown, and a table of unusual increases. Every bar, point, and row opens the exact reports behind it.
 
-8. **Heuristic Lab.** Preview a synthetic scenario at a chosen date, configure two sets of triage rules, and replay three calendar months. Saved runs compare recommended case actions and show the evidence behind each rule match.
+8. **Heuristic Lab.** Compare two sets of triage rules on three months of SaferProducts.gov reports in publication-date order. Saved runs show recommendations, evidence, and links to the public reports in Explorer.
 
-In the Heuristic Lab, **Add a rule** combines conditions to recommend a case action such as an in-depth investigation or IPT discussion. When several rules match a report at the same time, the first match supplies the recommendation. Results include evidence for all matches. End-of-replay checks can use time without new reports. The lab simulates recommendations on synthetic data, and actions have no external effect.
+In the Heuristic Lab, **Add a rule** combines conditions to recommend a case action such as an in-depth investigation or IPT discussion. When several rules match a report at the same time, the first match supplies the recommendation. Earlier reports can inform rolling counts. Both arrival and end-of-replay checks recommend actions for reports published during the replay. The Lab uses the current public snapshot and simulates the recommendations.
 
 Every value carries its provenance:
 

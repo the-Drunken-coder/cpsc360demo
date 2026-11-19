@@ -4,44 +4,45 @@ import { type FormEvent, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/client";
-import type { LabCaseAction, LabRules, LabTriageAction, LabTriageRule } from "../../api/heuristicLab";
+import type { LabCaseAction, LabRules, LabTriageRule } from "../../api/heuristicLab";
 import { useSession } from "../../session/SessionProvider";
 import { LabHelp } from "./LabHelp";
 import { RunResults } from "./RunResults";
-import { StartingReports } from "./StartingReports";
-import { TriageEditor } from "./TriageEditor";
+import { createRuleDraft, ruleLabel, TriageEditor, type RuleDraft } from "./TriageEditor";
 import "./heuristicLab.css";
 
 const LAB_PATH = "/heuristic-lab";
-const INITIAL_DATE = "2025-01-15";
 const SETS = [
   { id: "baseline", title: "Baseline", role: "Reference" },
   { id: "candidate", title: "Candidate", role: "Under test" },
 ] as const;
 const SHORT_DATE = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 type RuleSet = typeof SETS[number]["id"];
-type RuleSetDraft = LabRules<LabTriageAction | null>;
+type RuleSetDraft = { triage: RuleDraft[] };
 type RuleSetDrafts = Record<RuleSet, RuleSetDraft>;
 
-function replayEnd(start: string) {
-  const end = new Date(`${start}T00:00:00Z`);
-  const day = end.getUTCDate();
-  end.setUTCMonth(end.getUTCMonth() + 3, 1);
-  const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate();
-  end.setUTCDate(Math.min(day, lastDay));
-  return SHORT_DATE.format(end);
+function editRules(rules: LabRules): RuleSetDraft {
+  return { triage: (rules.triage ?? []).map(createRuleDraft) };
 }
 
-function scenarioQuery(start: string) {
-  return { queryKey: ["heuristic-lab", "scenario", start], queryFn: () => api.labScenario(start) };
+function scenarioQuery(start?: string) {
+  return {
+    queryKey: ["heuristic-lab", "public-preview", start],
+    queryFn: async () => {
+      const scenario = await api.labScenario(start);
+      return { ...scenario, baseline: editRules(scenario.baseline), candidate: editRules(scenario.candidate) };
+    },
+  };
 }
 
 function prepareRules(rules: RuleSetDraft): LabRules<LabCaseAction> | undefined {
   const triage: LabTriageRule<LabCaseAction>[] = [];
-  for (const rule of rules.triage ?? []) {
+  for (const rule of rules.triage) {
     if (!rule.action || "value" in rule.action) return undefined;
     triage.push({
-      ...rule,
+      ...ruleLabel(rule),
+      match: rule.match,
+      trigger: rule.trigger,
       action: rule.action,
       conditions: rule.conditions.map((condition) =>
         condition.kind === "number" && condition.operator === "unknown" ? { ...condition, value: 0 } : condition),
@@ -59,13 +60,16 @@ function LabWorkspace({ actorId, canWrite }: { actorId: number; canWrite: boolea
   const { runId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [start, setStart] = useState(INITIAL_DATE);
+  const [chosenStart, setStart] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<RuleSetDrafts | null>(null);
   const [activeSet, setActiveSet] = useState<RuleSet>("candidate");
   const [formVersion, setFormVersion] = useState(0);
-  const defaults = useQuery({ ...scenarioQuery(INITIAL_DATE), enabled: !runId });
+  const defaults = useQuery({ ...scenarioQuery(), enabled: !runId });
+  const start = chosenStart ?? defaults.data?.as_of ?? "";
   const validStart = Boolean(defaults.data && start >= defaults.data.first_start && start <= defaults.data.last_start);
-  const preview = useQuery({ ...scenarioQuery(start), enabled: !runId && validStart });
+  const useDefaultPreview = start === defaults.data?.as_of;
+  const selectedPreview = useQuery({ ...scenarioQuery(start), enabled: !runId && validStart && !useDefaultPreview });
+  const preview = useDefaultPreview ? defaults : selectedPreview;
   const historyKey = ["heuristic-lab", actorId, "runs"];
   const history = useQuery({ queryKey: historyKey, queryFn: api.labRuns });
   const run = useQuery({
@@ -106,7 +110,7 @@ function LabWorkspace({ actorId, canWrite }: { actorId: number; canWrite: boolea
     }
   }
 
-  function setUp(nextStart: string, nextDrafts: RuleSetDrafts | null) {
+  function setUp(nextStart: string | null, nextDrafts: RuleSetDrafts | null) {
     setStart(nextStart);
     setDrafts(nextDrafts);
     setActiveSet("candidate");
@@ -116,7 +120,7 @@ function LabWorkspace({ actorId, canWrite }: { actorId: number; canWrite: boolea
 
   function onRerun(next: LabRules) {
     if (!run.data) return;
-    setUp(run.data.start, { baseline: run.data.result.baseline.rules, candidate: next });
+    setUp(run.data.start, { baseline: editRules(run.data.result.baseline.rules), candidate: editRules(next) });
     navigate(LAB_PATH);
   }
 
@@ -124,12 +128,12 @@ function LabWorkspace({ actorId, canWrite }: { actorId: number; canWrite: boolea
     <header className="lab-header">
       <div>
         <h1>Heuristic Lab</h1>
-        <p>Replay the same three months of synthetic reports with two rule sets.</p>
+        <p>Compare two rule sets on the same public SaferProducts.gov reports.</p>
       </div>
       <Popover placement="bottom-end" minimal content={
         <nav className="lab-history" aria-label="Saved runs">
           <h2>Saved runs</h2>
-          <Link className={Classes.POPOVER_DISMISS} to={LAB_PATH} onClick={() => setUp(INITIAL_DATE, null)}>New run</Link>
+          <Link className={Classes.POPOVER_DISMISS} to={LAB_PATH} onClick={() => setUp(null, null)}>New run</Link>
           {history.isPending && <Spinner size={18} />}
           {history.isError && <Callout intent="danger">{history.error.message}</Callout>}
           {history.data?.length === 0 && <p>No saved runs yet.</p>}
@@ -154,17 +158,17 @@ function LabWorkspace({ actorId, canWrite }: { actorId: number; canWrite: boolea
           <div className="lab-date">
             <div className="lab-field-label">
               <label htmlFor="lab-start">Replay starts</label>
-              <LabHelp label="Replay dates" text="Each comparison runs for three calendar months. Reports available on the start date can contribute to patterns, and reports that arrive later are evaluated during the replay." />
+              <LabHelp label="Replay dates" text="The Lab replays three months of reports from the current public snapshot in publication-date order. Earlier reports can contribute to rolling counts. Rules recommend actions only for reports published during the replay." />
             </div>
             <input id="lab-start" className="bp5-input" type="date" required
               min={defaults.data?.first_start} max={defaults.data?.last_start}
               value={start} onChange={(event) => setStart(event.currentTarget.value)} />
-            {validStart && <span className="lab-subtle">Ends {replayEnd(start)}</span>}
+            {validStart && preview.data && <span className="lab-subtle">Ends {SHORT_DATE.format(new Date(`${preview.data.end}T00:00:00Z`))}</span>}
           </div>
           <div className="lab-preview">
             {defaults.data && !validStart && <p role="status">Choose a date from {defaults.data.first_start} to {defaults.data.last_start}.</p>}
-            {validStart && preview.isPending && <p role="status">Loading starting reports…</p>}
-            {preview.data && validStart && <StartingReports reports={preview.data.reports} />}
+            {validStart && preview.isPending && <p role="status">Counting public reports…</p>}
+            {preview.data && validStart && <p>{preview.data.report_count.toLocaleString()} public reports in this replay</p>}
           </div>
         </div>
         {(defaults.isError || (validStart && preview.isError)) && <Callout intent="danger">
@@ -175,7 +179,7 @@ function LabWorkspace({ actorId, canWrite }: { actorId: number; canWrite: boolea
           onChange={(id) => { if (id === "baseline" || id === "candidate") setActiveSet(id); }}>
           {SETS.map(({ id, title, role }) => <Tab key={id} id={id} title={<>{title} <span className="lab-tab-role">· {role}</span></>}
             panel={<div className="lab-rule-editor" data-rule-set={id} data-readonly={!canWrite || undefined}>
-              <TriageEditor rules={ruleSets[id].triage ?? []} disabled={!canWrite}
+              <TriageEditor rules={ruleSets[id].triage} disabled={!canWrite}
                 onChange={(triage) => setDrafts({ baseline: ruleSets.baseline, candidate: ruleSets.candidate, [id]: { triage } })} />
             </div>} />)}
         </Tabs>}

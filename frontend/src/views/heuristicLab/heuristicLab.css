@@ -60,6 +60,40 @@
 .lab-editor-heading h3, .lab-editor-fields h4, .lab-result-section h3 { margin: 0; font-size: 14px; }
 .lab-help-text { margin: 0; padding: 10px 12px; width: max-content; max-width: min(285px, 80vw); }
 .lab-empty-rules { padding: 8px 0; color: var(--muted); }
+.lab-rule-order { padding: 4px 0 8px; color: var(--muted); }
+.lab-rule-list { margin: 0; padding-inline-start: 23px; list-style-type: decimal; }
+.lab-rule-row { position: relative; }
+.lab-rule-row::marker { color: var(--muted); font-variant-numeric: tabular-nums; }
+.lab-rule-handle.bp5-button {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.lab-rule-handle.bp5-button:active { cursor: grabbing; }
+.lab-rule-handle + .lab-editor-detail > summary { padding-inline-start: 38px; }
+.lab-rule-row[data-dragging] { background: var(--selected); }
+.lab-rule-row[data-drop-before]::after, .lab-rule-row[data-drop-after]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  border-top: 2px solid var(--blue);
+  pointer-events: none;
+}
+.lab-rule-row[data-drop-before]::after { top: -1px; }
+.lab-rule-row[data-drop-after]::after { bottom: -1px; }
+.lab-reorder-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .lab-editor-detail { border-bottom: 1px solid var(--line); }
 .lab-editor-detail summary {
   display: grid;

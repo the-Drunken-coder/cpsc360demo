@@ -6,10 +6,12 @@ export interface LabReport {
   id: string;
   available_on: string;
   product: string;
-  hazard: string;
-  injury: boolean;
+  hazard: string | null;
+  hazards?: string[] | null;
+  injury: boolean | null;
   narrative: string;
   facts?: Record<string, string | number | boolean>;
+  source_sha256?: string | null;
 }
 
 export interface LabScenario {
@@ -19,7 +21,8 @@ export interface LabScenario {
   as_of: string;
   baseline: LabRules;
   candidate: LabRules;
-  reports: LabReport[];
+  end: string;
+  report_count: number;
 }
 
 export interface LabCase {
@@ -56,6 +59,7 @@ export interface LabRun extends LabRunSummary {
   result: {
     scenario: string;
     evaluator: string;
+    source: "public" | "synthetic";
     start: string;
     end: string;
     starting_reports: LabReport[];
@@ -90,6 +94,7 @@ export type LabCondition =
 
 export interface LabTriageRule<Action extends LabTriageAction | null = LabTriageAction> {
   name: string;
+  auto_named?: boolean;
   match: "all" | "any";
   trigger?: "arrival" | "end";
   conditions: LabCondition[];

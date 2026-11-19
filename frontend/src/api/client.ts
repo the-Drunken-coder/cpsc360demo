@@ -77,7 +77,7 @@ async function none(method: string, path: string): Promise<void> {
 const enc = encodeURIComponent;
 
 export const api = {
-  labScenario: (asOf: string) => json<LabScenario>("GET", "/heuristic-lab/scenario", undefined, { as_of: asOf }),
+  labScenario: (asOf?: string) => json<LabScenario>("GET", "/heuristic-lab/scenario", undefined, { as_of: asOf }),
   labRuns: () => json<LabRunSummary[]>("GET", "/heuristic-lab/runs"),
   labRun: (id: string) => json<LabRun>("GET", `/heuristic-lab/runs/${encodeURIComponent(id)}`),
   runLab: (body: LabRunInput) => json<LabRun>("POST", "/heuristic-lab/runs", body),

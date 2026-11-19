@@ -1,8 +1,9 @@
-"""Deterministic replay of synthetic product reports."""
+"""Deterministic replay of product reports."""
 
 from calendar import monthrange
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,7 +11,7 @@ from . import lab_rules
 
 FIRST_DAY = date(2025, 1, 1)
 LAST_START = date(2025, 3, 31)
-SCENARIO = 'product-safety-v1'
+SCENARIO = 'product-safety-v2'
 EVALUATOR = 'product-rules-v2'
 
 
@@ -27,7 +28,7 @@ CANDIDATE = Rules[lab_rules.CaseAction]()
 class RunInput[ActionT: lab_rules.Action](BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    start: date = Field(ge=FIRST_DAY, le=LAST_START)
+    start: date
     baseline: Rules[ActionT]
     candidate: Rules[ActionT]
 
@@ -36,10 +37,15 @@ class Report(BaseModel):
     id: str
     available_on: date
     product: str
-    hazard: str
-    injury: bool
+    hazard: str | None
+    injury: bool | None
     narrative: str
     facts: dict[str, str | bool | int | float] = Field(default_factory=dict)
+    hazards: list[str] | None = None
+    product_key: str | None = None
+    manufacturer_key: str | None = None
+    model_key: str | None = None
+    source_sha256: str | None = None
 
 
 class ScenarioView(BaseModel):
@@ -49,7 +55,8 @@ class ScenarioView(BaseModel):
     as_of: date
     baseline: Rules
     candidate: Rules
-    reports: list[Report]
+    end: date
+    report_count: int
 
 
 class Case(BaseModel):
@@ -89,6 +96,10 @@ CASES = (
         (60, False, 'The housing has a scratch near the label.'),
         (62, False, 'The outer paint is flaking. The fan works normally.'),
     ]),
+    # April 1 falls inside every supported replay window.
+    sample_case('L09', 'Fatal dresser tip-over', 'Dresser', 'Tip-over', [
+        (90, True, 'A dresser tipped over. The report states that the incident resulted in a death.'),
+    ]),
     sample_case('L06', 'Later battery reports', 'Cordless drill', 'Overheating', [
         (101, False, 'The charger began emitting smoke.'),
         (112, False, 'The battery casing melted after charging.'),
@@ -127,6 +138,7 @@ class Evaluation(BaseModel):
 class RunResult(BaseModel):
     scenario: str
     evaluator: str
+    source: Literal['public', 'synthetic'] = 'synthetic'
     start: date
     end: date
     starting_reports: list[Report]
@@ -152,32 +164,40 @@ def available_reports(as_of: date) -> list[Report]:
     )
 
 
-def end_date(start: date) -> date:
-    year, month = divmod(start.year * 12 + start.month - 1 + 3, 12)
+def shift_months(start: date, months: int) -> date:
+    year, month = divmod(start.year * 12 + start.month - 1 + months, 12)
     return date(year, month + 1, min(start.day, monthrange(year, month + 1)[1]))
 
 
-def evaluate(cases: tuple[Case, ...], rules: Rules, start: date, end: date) -> Evaluation:
+def end_date(start: date) -> date:
+    return shift_months(start, 3)
+
+
+def evaluate(cases: tuple[Case, ...], rules: Rules, start: date, end: date, *,
+             check_starting_reports: bool = True) -> Evaluation:
     decisions: dict[str, list[Decision]] = defaultdict(list)
     timeline = sorted(
         ((report, case.id) for case in cases for report in case.reports if report.available_on <= end),
         key=lambda item: (item[0].available_on, item[0].id),
     )
-    previous = []
+    history = lab_rules.History(rules.triage)
+    evaluated = []
     for report, case_id in timeline:
         facts = lab_rules.report_facts(report)
-        previous.append(facts)
+        history.add(facts)
+        if check_starting_reports or report.available_on > start:
+            evaluated.append((report, facts))
         if report.available_on > start:
             decisions[case_id].append(Decision(
-                report=report, triage=lab_rules.apply_rules(rules.triage, facts, previous, report.available_on),
+                report=report, triage=lab_rules.apply_rules(rules.triage, facts, history, report.available_on),
             ))
 
     results = [CaseResult(id=case.id, title=case.title, decisions=decisions[case.id])
                for case in cases if case.id in decisions]
     end_checks = []
     if any(rule.trigger == 'end' for rule in rules.triage):
-        for (report, _), facts in zip(timeline, previous, strict=True):
-            checks = lab_rules.apply_rules(rules.triage, facts, previous, end, 'end')
+        for report, facts in evaluated:
+            checks = lab_rules.apply_rules(rules.triage, facts, history, end, 'end')
             if checks:
                 end_checks.append(Decision(report=report, triage=checks))
     return Evaluation(rules=SavedRules(triage=rules.triage), cases=results, end_checks=end_checks)

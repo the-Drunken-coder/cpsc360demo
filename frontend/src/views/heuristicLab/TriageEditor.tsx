@@ -1,5 +1,5 @@
 import { Button } from "@blueprintjs/core";
-import { useId, useRef } from "react";
+import { type PointerEvent, useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   TRIAGE_ACTIONS, TRIAGE_FLAGS, TRIAGE_GROUPS, TRIAGE_NUMBER_FIELDS, TRIAGE_TEXT_FIELDS,
@@ -13,7 +13,7 @@ const CONDITION_LABELS = { text: "Text match", number: "Numeric threshold", flag
 const OPERATORS: Record<string, string> = {
   gte: "At least", gt: "Greater than", lte: "At most", lt: "Less than", eq: "Exactly", unknown: "Unknown",
   contains_any: "Contains any", contains_all: "Contains all", equals_any: "Equals any", contains_none: "Contains none",
-  narrative: "Report narrative", injury: "Injury reported", product_hazard: "Product and hazard",
+  narrative: "Report narrative", injury: "Injury reported", death: "Death reported", product_hazard: "Product and hazard",
   make_model: "Make and model", tbsa: "Burn area (% TBSA)",
   all: "All", any: "Any", yes: "Yes", no: "No",
 };
@@ -41,7 +41,14 @@ const LEGACY_ACTIONS = {
   priority: "Set priority", disposition: "Recommend disposition", suppress: "Suppress action", audit: "Mark for audit",
 } satisfies Record<Exclude<LabTriageAction["kind"], LabCaseAction["kind"]>, string>;
 
-type RuleDraft = LabTriageRule<LabTriageAction | null>;
+export type RuleDraft = LabTriageRule<LabTriageAction | null> & { draftId: number };
+type RuleText = LabTriageRule<LabTriageAction | null>;
+const RULE_NAME_LIMIT = 80;
+let nextDraftId = 0;
+
+export function createRuleDraft(rule: RuleText): RuleDraft {
+  return { ...rule, draftId: nextDraftId++ };
+}
 
 function readable(value: string) {
   return OPERATORS[value] ?? value.replaceAll("_", " ");
@@ -82,11 +89,35 @@ function conditionText(condition: LabCondition) {
     case "number": return condition.operator === "unknown" ? `${readable(condition.field)} is unknown`
       : `${readable(condition.field)} is ${operator}${Number.isNaN(condition.value) ? "" : ` ${condition.value}`}`;
     case "flag": return `${readable(condition.field)} is ${condition.state}`;
-    case "count": return `Rolling count by ${readable(condition.group).toLowerCase()}`;
-    case "score": return "Keyword score";
+    case "count": {
+      const group = readable(condition.group).toLowerCase();
+      if (Number.isNaN(condition.threshold) || Number.isNaN(condition.window_days)) return `Rolling count by ${group}`;
+      const filter = condition.filter === "all" ? "" : condition.filter === "injury" ? " with injury" : " with hospitalization";
+      return `${operator} ${condition.threshold} ${condition.measure}${filter} in ${condition.window_days} days by ${group}`;
+    }
+    case "score": return Number.isNaN(condition.threshold) ? "Keyword score"
+      : `${operator} ${condition.threshold} keywords${condition.terms.trim() ? ` from “${condition.terms.trim()}”` : ""}`;
     case "sample": return Number.isNaN(condition.percent) ? "Audit sample" : `${condition.percent}% audit sample`;
-    case "quiet": return Number.isNaN(condition.days) ? "Quiet period" : `${condition.days} days without new reports`;
+    case "quiet": return Number.isNaN(condition.days) ? "Quiet period"
+      : `${condition.days} days without new reports by ${readable(condition.group).toLowerCase()}`;
   }
+}
+
+function conditionSummary(rule: RuleText) {
+  return rule.conditions.map(conditionText).join(rule.match === "all" ? " and " : " or ");
+}
+
+function automaticRuleName(rule: RuleText) {
+  const condition = conditionSummary(rule);
+  const action = rule.action ? recommendationText(rule.action) : "New rule";
+  const timing = rule.trigger === "end" ? " at replay end" : "";
+  const name = Array.from(`${action}${timing} · ${condition}`);
+  return name.length <= RULE_NAME_LIMIT ? name.join("") : `${name.slice(0, RULE_NAME_LIMIT - 1).join("").trimEnd()}…`;
+}
+
+export function ruleLabel(rule: RuleText) {
+  const manualName = rule.auto_named ? "" : rule.name.trim();
+  return { name: manualName || automaticRuleName(rule), auto_named: !manualName };
 }
 
 function Picker<T extends string>({ label, options, value, onChange, format = readable }: {
@@ -104,13 +135,15 @@ function Picker<T extends string>({ label, options, value, onChange, format = re
   </select></label>;
 }
 
-function TextValue({ label, value, onChange, limit = 80, list = false, help }: {
+function TextValue({ label, value, onChange, limit = 80, list = false, help, placeholder, required = true }: {
   label: string; value: string; onChange: (value: string) => void; limit?: number; list?: boolean; help?: string;
+  placeholder?: string; required?: boolean;
 }) {
   const id = useId();
   return <div className="lab-text-field">
     <div className="lab-field-label"><label htmlFor={id}>{label}</label>{help && <LabHelp label={label} text={help} />}</div>
-    <input id={id} className="bp5-input" required pattern={list ? ".*[^\\s,].*" : ".*\\S.*"} maxLength={limit}
+    <input id={id} className="bp5-input" required={required} placeholder={placeholder}
+      pattern={required ? (list ? ".*[^\\s,].*" : ".*\\S.*") : undefined} maxLength={limit}
       value={value} onChange={(event) => onChange(event.currentTarget.value)} />
   </div>;
 }
@@ -177,39 +210,104 @@ function ConditionFields({ condition, change }: { condition: LabCondition; chang
   }
 }
 
+interface RuleDrag {
+  pointerId: number;
+  from: number;
+  startY: number;
+  y: number;
+  active: boolean;
+  frame: number | null;
+}
+
 export function TriageEditor({ rules, onChange, disabled }: {
   rules: RuleDraft[];
   onChange: (rules: RuleDraft[]) => void;
   disabled: boolean;
 }) {
   const group = useId();
-  const list = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLOListElement>(null);
   const add = useRef<HTMLButtonElement>(null);
+  const drag = useRef<RuleDrag | null>(null);
+  const [placement, setPlacement] = useState<{ from: number; to: number } | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+
+  useEffect(() => () => {
+    const frame = drag.current?.frame;
+    if (frame != null) cancelAnimationFrame(frame);
+  }, []);
 
   function update(index: number, rule: RuleDraft) {
     onChange(rules.map((item, position) => position === index ? rule : item));
   }
 
   function appendRule() {
-    flushSync(() => onChange([...rules, { name: "", match: "all", conditions: [DEFAULTS.flag], action: null }]));
-    const detail = list.current?.querySelector<HTMLDetailsElement>("details:last-child");
+    flushSync(() => onChange([...rules, createRuleDraft({ name: "", match: "all", conditions: [DEFAULTS.flag], action: null })]));
+    const detail = list.current?.lastElementChild?.querySelector("details");
     if (detail) {
       detail.open = true;
       detail.querySelector("input")?.focus();
     }
   }
 
-  function moveRuleUp(index: number, rule: RuleDraft) {
-    flushSync(() => onChange([...rules.slice(0, index - 1), rule, ...rules.slice(index - 1, index), ...rules.slice(index + 1)]));
-    const detail = list.current?.querySelectorAll("details")[index - 1];
-    if (detail) {
-      detail.open = true;
-      detail.querySelector("summary")?.focus();
+  function moveRule(from: number, to: number) {
+    const rule = rules[from];
+    if (disabled || !rule || from === to || to < 0 || to >= rules.length) return;
+    const next = rules.filter((_, index) => index !== from);
+    next.splice(to, 0, rule);
+    flushSync(() => onChange(next));
+    list.current?.children[to]?.querySelector<HTMLButtonElement>(".lab-rule-handle")?.focus({ preventScroll: true });
+    setAnnouncement(`Moved ${ruleLabel(rule).name} to position ${to + 1} of ${rules.length}.`);
+  }
+
+  function dropIndex({ from, y }: RuleDrag) {
+    const summaries = Array.from(list.current?.querySelectorAll("summary") ?? []);
+    const next = summaries.findIndex((summary) => {
+      const rect = summary.getBoundingClientRect();
+      return y < rect.top + rect.height / 2;
+    });
+    const insertion = next < 0 ? summaries.length : next;
+    return insertion > from ? insertion - 1 : insertion;
+  }
+
+  function startDrag(event: PointerEvent<HTMLButtonElement>, from: number) {
+    if (disabled || rules.length < 2 || drag.current || !event.isPrimary || event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { pointerId: event.pointerId, from, startY: event.clientY, y: event.clientY, active: false, frame: null };
+  }
+
+  function trackDrag(active: RuleDrag) {
+    active.frame = null;
+    const scroller = list.current?.closest<HTMLElement>(".page.heuristic-lab");
+    if (scroller) {
+      const rect = scroller.getBoundingClientRect();
+      const step = active.y < rect.top + 36 ? -12 : active.y > rect.bottom - 36 ? 12 : 0;
+      const before = scroller.scrollTop;
+      scroller.scrollTop += step;
+      if (scroller.scrollTop !== before) active.frame = requestAnimationFrame(() => trackDrag(active));
     }
+    const to = dropIndex(active);
+    setPlacement((current) => current?.from === active.from && current.to === to ? current : { from: active.from, to });
+  }
+
+  function updateDrag(event: PointerEvent<HTMLButtonElement>) {
+    const active = drag.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    active.y = event.clientY;
+    if (!active.active && Math.abs(active.y - active.startY) < 4) return;
+    active.active = true;
+    if (active.frame === null) trackDrag(active);
+  }
+
+  function finishDrag(event: PointerEvent<HTMLButtonElement>, drop: boolean) {
+    const active = drag.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    drag.current = null;
+    if (active.frame !== null) cancelAnimationFrame(active.frame);
+    setPlacement(null);
+    if (drop && active.active) moveRule(active.from, dropIndex({ ...active, y: event.clientY }));
   }
 
   function removeRule(index: number) {
-    list.current?.querySelectorAll("details")[index]?.removeAttribute("open");
     flushSync(() => onChange(rules.filter((_, position) => position !== index)));
     add.current?.focus();
   }
@@ -222,56 +320,84 @@ export function TriageEditor({ rules, onChange, disabled }: {
         disabled={disabled || rules.length >= 20} onClick={appendRule} />
     </div>
     {rules.length === 0 && <p className="lab-empty-rules">No triage rules in this set.</p>}
-    <div ref={list}>
-      {rules.map((rule, index) => <details className="lab-editor-detail" name={group} key={index}>
-        <summary>
-          <strong>{rule.name.trim() || "Unnamed rule"}</strong>
-          <span>{rule.conditions.map(conditionText).join(rule.match === "all" ? " and " : " or ")} → {rule.action ? recommendationText(rule.action) : "Choose a case action"}</span>
-          <span className="lab-disclosure-action" aria-hidden="true" />
-        </summary>
-        <fieldset className="lab-editor-fields lab-triage-fields" disabled={disabled}>
-          <TextValue label="Rule name" value={rule.name} onChange={(name) => update(index, { ...rule, name })} />
-          <div className="lab-rule-step">
-            <div className="lab-field-label">
-              <h4>When</h4>
-              <LabHelp label="When to evaluate" text="Arrival rules evaluate each new report as it becomes available. End-of-replay rules use all reports available by the end date and can check for periods with no new reports." />
-            </div>
-            <div className="lab-fields">
-              <Picker label="Evaluate" options={rule.conditions.some((condition) => condition.kind === "quiet") ? ["end"] : ["arrival", "end"]} value={rule.trigger ?? "arrival"}
-                format={(value) => value === "arrival" ? "On report arrival" : "At the end of the replay"}
-                onChange={(trigger) => update(index, { ...rule, trigger })} />
-              <Picker label="Require" options={["all", "any"] as const} value={rule.match}
-                format={(value) => value === "all" ? "All conditions to match" : "Any condition to match"}
-                onChange={(match) => update(index, { ...rule, match })} />
-            </div>
-            {rule.conditions.map((condition, position) => <div className="lab-condition" key={position}>
-              <div className="lab-fields">
-                <Picker label="Condition type" options={CONDITION_TYPES} value={condition.kind} format={(kind) => CONDITION_LABELS[kind]}
-                  onChange={(kind) => update(index, { ...rule, trigger: kind === "quiet" ? "end" : rule.trigger,
-                    conditions: rule.conditions.map((item, offset) => offset === position ? DEFAULTS[kind] : item) })} />
-                <ConditionFields condition={condition} change={(next) => update(index, {
-                  ...rule, conditions: rule.conditions.map((item, offset) => offset === position ? next : item),
-                })} />
+    {rules.length > 0 && <p className="lab-rule-order" id={`${group}-order`}>
+      Rules run top to bottom. First match wins.{!disabled && rules.length > 1 && " Drag a handle or use its arrow keys to reorder."}
+    </p>}
+    <div className="lab-reorder-status" role="status">{announcement}</div>
+    <ol ref={list} className="lab-rule-list">
+      {rules.map((rule, index) => <li className="lab-rule-row" key={rule.draftId}
+        data-dragging={placement?.from === index || undefined}
+        data-drop-before={placement?.to === index && index < placement.from || undefined}
+        data-drop-after={placement?.to === index && index > placement.from || undefined}>
+        {!disabled && rules.length > 1 && <Button type="button" minimal icon="drag-handle-vertical" className="lab-rule-handle"
+          aria-label={`Reorder rule ${index + 1}: ${ruleLabel(rule).name}`} aria-describedby={`${group}-order`}
+          onPointerDown={(event) => startDrag(event, index)} onPointerMove={updateDrag}
+          onPointerUp={(event) => finishDrag(event, true)} onPointerCancel={(event) => finishDrag(event, false)}
+          onLostPointerCapture={(event) => finishDrag(event, false)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && drag.current) {
+              event.currentTarget.releasePointerCapture(drag.current.pointerId);
+              return;
+            }
+            if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+              event.preventDefault();
+              if (!drag.current) moveRule(index, index + (event.key === "ArrowUp" ? -1 : 1));
+            }
+          }} />}
+        <details className="lab-editor-detail" name={group}>
+          <summary>
+            <strong>{ruleLabel(rule).name}</strong>
+            <span>{conditionSummary(rule)} → {rule.action ? recommendationText(rule.action) : "Choose a case action"}</span>
+            <span className="lab-disclosure-action" aria-hidden="true" />
+          </summary>
+          <fieldset className="lab-editor-fields lab-triage-fields" disabled={disabled}>
+            <TextValue label="Rule name (optional)" value={rule.auto_named ? "" : rule.name}
+              limit={RULE_NAME_LIMIT} placeholder={automaticRuleName(rule)} required={false}
+              help="Leave blank to use a name based on the rule’s conditions and action."
+              onChange={(name) => update(index, { ...rule, name, auto_named: false })} />
+            <div className="lab-rule-step">
+              <div className="lab-field-label">
+                <h4>When</h4>
+                <LabHelp label="When to evaluate" text="Arrival rules evaluate each new report as it becomes available. End-of-replay rules use all reports available by the end date and can check for periods with no new reports." />
               </div>
-              {rule.conditions.length > 1 && <Button type="button" small minimal text="Remove condition"
-                onClick={() => update(index, { ...rule, conditions: rule.conditions.filter((_, offset) => offset !== position) })} />}
-            </div>)}
-            <div><Button type="button" small icon="add" text="Add condition" disabled={rule.conditions.length >= 12}
-              onClick={() => update(index, { ...rule, conditions: [...rule.conditions, DEFAULTS.flag] })} /></div>
-          </div>
-          <div className="lab-rule-step">
-            <div className="lab-field-label">
-              <h4>Then</h4>
-              <LabHelp label="Action order" text="When several rules match a report at the same time, the first matching rule supplies the recommended action. The other matches still appear in the evidence." />
+              <div className="lab-fields">
+                <Picker label="Evaluate" options={rule.conditions.some((condition) => condition.kind === "quiet") ? ["end"] : ["arrival", "end"]} value={rule.trigger ?? "arrival"}
+                  format={(value) => value === "arrival" ? "On report arrival" : "At the end of the replay"}
+                  onChange={(trigger) => update(index, { ...rule, trigger })} />
+                <Picker label="Require" options={["all", "any"] as const} value={rule.match}
+                  format={(value) => value === "all" ? "All conditions to match" : "Any condition to match"}
+                  onChange={(match) => update(index, { ...rule, match })} />
+              </div>
+              {rule.conditions.map((condition, position) => <div className="lab-condition" key={position}>
+                <div className="lab-fields">
+                  <Picker label="Condition type" options={CONDITION_TYPES} value={condition.kind} format={(kind) => CONDITION_LABELS[kind]}
+                    onChange={(kind) => update(index, { ...rule, trigger: kind === "quiet" ? "end" : rule.trigger,
+                      conditions: rule.conditions.map((item, offset) => offset === position ? DEFAULTS[kind] : item) })} />
+                  <ConditionFields condition={condition} change={(next) => update(index, {
+                    ...rule, conditions: rule.conditions.map((item, offset) => offset === position ? next : item),
+                  })} />
+                </div>
+                {rule.conditions.length > 1 && <Button type="button" small minimal text="Remove condition"
+                  onClick={() => update(index, { ...rule, conditions: rule.conditions.filter((_, offset) => offset !== position) })} />}
+              </div>)}
+              <div><Button type="button" small icon="add" text="Add condition" disabled={rule.conditions.length >= 12}
+                onClick={() => update(index, { ...rule, conditions: [...rule.conditions, DEFAULTS.flag] })} /></div>
             </div>
-            <CaseActionPicker action={rule.action} onChange={(action) => update(index, { ...rule, action })} />
-          </div>
-          <div className="lab-rule-controls">
-            <Button type="button" small minimal icon="arrow-up" text="Move rule up" disabled={index === 0} onClick={() => moveRuleUp(index, rule)} />
-            <Button type="button" small minimal intent="danger" text="Remove rule" onClick={() => removeRule(index)} />
-          </div>
-        </fieldset>
-      </details>)}
-    </div>
+            <div className="lab-rule-step">
+              <div className="lab-field-label">
+                <h4>Then</h4>
+                <LabHelp label="Action order" text="When several rules match a report at the same time, the first matching rule supplies the recommended action. The other matches still appear in the evidence." />
+              </div>
+              <CaseActionPicker action={rule.action} onChange={(action) => update(index, { ...rule, action })} />
+            </div>
+            <div className="lab-rule-controls">
+              <Button type="button" small minimal icon="arrow-up" text="Move rule up" disabled={index === 0} onClick={() => moveRule(index, index - 1)} />
+              <Button type="button" small minimal icon="arrow-down" text="Move rule down" disabled={index === rules.length - 1} onClick={() => moveRule(index, index + 1)} />
+              <Button type="button" small minimal intent="danger" text="Remove rule" onClick={() => removeRule(index)} />
+            </div>
+          </fieldset>
+        </details>
+      </li>)}
+    </ol>
   </section>;
 }

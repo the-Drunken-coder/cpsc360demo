@@ -1,6 +1,8 @@
 """Configurable triage rules for synthetic reports."""
 
 from datetime import date, timedelta
+from bisect import bisect_left
+from collections import defaultdict
 from hashlib import sha256
 import re
 from typing import Annotated, Literal
@@ -35,6 +37,7 @@ FACTS = {
     'L07-1': {'jurisdiction': 'Unassigned'},
     'L08-1': {'manufacturer': 'Juniper', 'model': 'S4', 'people_injured': 2},
     'L08-2': {'manufacturer': 'Juniper', 'model': 'S4'},
+    'L09-1': {'death': True},
 }
 
 
@@ -130,6 +133,7 @@ Action = Annotated[CaseAction | LegacyAction, Field(discriminator='kind')]
 
 class Rule[ActionT: Action](Config):
     name: str = Field(min_length=1, max_length=80)
+    auto_named: bool = False
     match: Literal['all', 'any']
     trigger: Literal['arrival', 'end'] = 'arrival'
     conditions: list[Condition] = Field(min_length=1, max_length=12)
@@ -157,29 +161,76 @@ def terms(value: str) -> list[str]:
     return list(dict.fromkeys(term.strip().casefold() for term in value.split(',') if term.strip()))
 
 
-def group_key(facts: dict, group: Group) -> tuple:
-    fields = {'product_hazard': ('product', 'hazard'), 'make_model': ('manufacturer', 'model'),
-              'manufacturer_hazard': ('manufacturer', 'hazard')}.get(group, (group,))
-    return tuple(facts.get(field) for field in fields)
+def hazards(facts: dict) -> tuple[str, ...]:
+    labels = facts.get('hazards')
+    if labels is not None:
+        return tuple(labels)
+    return (facts['hazard'],) if facts.get('hazard') else ()
 
 
-def matches(condition: Condition, facts: dict, previous: list[dict], day: date) -> str | None:
+def group_keys(facts: dict, group: Group) -> list[tuple[str, ...]]:
+    product = facts.get('product_key') or (facts.get('product') or '').strip() or None
+    manufacturer = facts.get('manufacturer_key') or facts.get('manufacturer')
+    model = facts.get('model_key') or facts.get('model')
+    dimensions = {
+        'product': (product,), 'manufacturer': (manufacturer,), 'make_model': (manufacturer, model),
+        'hazard': (), 'product_hazard': (product,), 'manufacturer_hazard': (manufacturer,),
+    }[group]
+    if None in dimensions:
+        return []
+    if group in ('hazard', 'product_hazard', 'manufacturer_hazard'):
+        return [(*dimensions, hazard) for hazard in hazards(facts)]
+    return [dimensions]
+
+
+class History:
+    def __init__(self, rules: list[Rule]):
+        self.groups = {
+            condition.group: defaultdict(list)
+            for rule in rules for condition in rule.conditions
+            if isinstance(condition, (CountCondition, QuietCondition))
+        }
+
+    def add(self, facts: dict) -> None:
+        for group, buckets in self.groups.items():
+            for key in group_keys(facts, group):
+                buckets[key].append(facts)
+
+    def latest(self, group: Group, keys: list[tuple[str, ...]]) -> date | None:
+        buckets = self.groups[group]
+        return max((buckets[key][-1]['available_on'] for key in keys if buckets.get(key)), default=None)
+
+    def since(self, group: Group, keys: list[tuple[str, ...]], cutoff: date) -> list[dict]:
+        buckets = self.groups[group]
+        if len(keys) == 1:
+            reports = buckets.get(keys[0], [])
+            return reports[bisect_left(reports, cutoff, key=lambda report: report['available_on']):]
+        reports = {}
+        for key in keys:
+            for report in self.since(group, [key], cutoff):
+                reports[report['id']] = report
+        return sorted(reports.values(), key=lambda report: (report['available_on'], report['id']))
+
+
+def matches(condition: Condition, facts: dict, history: History, day: date) -> str | None:
     if isinstance(condition, TextCondition):
         value = facts.get(condition.field)
+        values = hazards(facts) if condition.field == 'hazard' else (value,) if value is not None else ()
+        values = tuple(filter(None, (item.strip().casefold() for item in values)))
         if condition.operator == 'unknown':
-            return f'{condition.field} is unknown' if value is None else None
+            return f'{condition.field} is unknown' if not values else None
         phrases = terms(condition.value)
-        if value is None or not phrases:
+        if not values or not phrases:
             return None
-        value = value.casefold()
-        found = [phrase for phrase in phrases if phrase in value]
+        found = [phrase for phrase in phrases if any(phrase in item for item in values)]
+        equal = [item for item in values if item in phrases]
         matched = {
             'contains_any': bool(found), 'contains_all': len(found) == len(phrases),
-            'contains_none': not found, 'equals_any': value in phrases,
+            'contains_none': not found, 'equals_any': bool(equal),
         }[condition.operator]
         if not matched:
             return None
-        evidence = phrases if condition.operator == 'contains_none' else [value] if condition.operator == 'equals_any' else found
+        evidence = phrases if condition.operator == 'contains_none' else equal if condition.operator == 'equals_any' else found
         return f'{condition.field}: {condition.operator.replace("_", " ")} {", ".join(evidence)}'
     if isinstance(condition, NumberCondition):
         value = facts.get(condition.field)
@@ -195,39 +246,41 @@ def matches(condition: Condition, facts: dict, previous: list[dict], day: date) 
         state = 'unknown' if value is None else 'yes' if value else 'no'
         return f'{condition.field.replace("_", " ")}: {state}' if state == condition.state else None
     if isinstance(condition, ScoreCondition):
-        narrative = facts['narrative'].casefold()
+        narrative = facts['narrative'].strip().casefold()
+        if not narrative:
+            return None
         found = [term for term in terms(condition.terms) if re.search(r'(?<!\w)' + re.escape(term) + r'(?!\w)', narrative)]
         matched = len(found) >= condition.threshold if condition.operator == 'gte' else len(found) == condition.threshold
         return f'Keyword score {len(found)} ({", ".join(found) or "no matches"})' if matched else None
     if isinstance(condition, SampleCondition):
         bucket = int.from_bytes(sha256(facts['id'].encode()).digest()[:8]) % 100
         return f'In deterministic {condition.percent}% sample' if bucket < condition.percent else None
-    key = group_key(facts, condition.group)
-    if None in key:
+    keys = group_keys(facts, condition.group)
+    if not keys:
         return None
     if isinstance(condition, QuietCondition):
-        last = max((item['available_on'] for item in previous if group_key(item, condition.group) == key), default=None)
+        last = history.latest(condition.group, keys)
         if last is None:
             return None
         elapsed = (day - last).days
         return f'{elapsed} days since the latest matching report ({last})' if elapsed >= condition.days else None
     cutoff = day - timedelta(days=condition.window_days - 1)
-    items = [item for item in previous if item['available_on'] >= cutoff
-           and group_key(item, condition.group) == key
-           and (condition.filter == 'all' or item.get(condition.filter) is True)]
+    items = [item for item in history.since(condition.group, keys, cutoff)
+             if condition.filter == 'all' or item.get(condition.filter) is True]
     ids = [item['id'] for item in items]
-    count = len(ids) if condition.measure == 'reports' else len({item['manufacturer'] for item in items if item.get('manufacturer')})
+    manufacturers = {item.get('manufacturer_key') or item.get('manufacturer') for item in items}
+    count = len(ids) if condition.measure == 'reports' else len(manufacturers - {None, ''})
     matched = count >= condition.threshold if condition.operator == 'gte' else count <= condition.threshold
     return f'{count} matching {condition.measure} in {condition.window_days} days ({", ".join(ids) or "none"})' if matched else None
 
 
-def apply_rules(rules: list[Rule], facts: dict, previous: list[dict], day: date,
+def apply_rules(rules: list[Rule], facts: dict, history: History, day: date,
                 trigger: Literal['arrival', 'end'] = 'arrival') -> list[Match]:
     result = []
     for rule in rules:
         if rule.trigger != trigger:
             continue
-        evidence = [reason for condition in rule.conditions if (reason := matches(condition, facts, previous, day))]
+        evidence = [reason for condition in rule.conditions if (reason := matches(condition, facts, history, day))]
         if evidence and (rule.match == 'any' or len(evidence) == len(rule.conditions)):
             result.append(Match(rule=rule.name, action=rule.action, evidence=evidence))
     suppressed = {':'.join(part.strip() for part in item.action.value.casefold().split(':', 1))

@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import JSONResponse
 from psycopg.types.json import Jsonb
 
-from . import ai_hazards, opencode_go, analytics, heuristic_lab as lab, ingest, lab_rules, models as m, workspace as w
+from . import ai_hazards, opencode_go, analytics, heuristic_lab as lab, ingest, lab_public, lab_rules, models as m, workspace as w
 from .derive import HAZARD_LABELS
 from .search import FACETS, JOIN, connection, filters_sql, index, pair_reasons, reports, summaries, summary
 from .source_csv import COLUMNS, INCIDENT_COLUMNS
@@ -483,12 +483,9 @@ async def classify_hazards(body: m.AISelection, actor: Writer):
 
 
 @app.get('/api/heuristic-lab/scenario', response_model=lab.ScenarioView)
-def lab_scenario(actor: Auth, as_of: date = Query(lab.FIRST_DAY)):
-    if not lab.FIRST_DAY <= as_of <= lab.LAST_START:
-        raise HTTPException(422, 'Start date is outside the scenario range.')
-    return lab.ScenarioView(version=lab.SCENARIO, first_start=lab.FIRST_DAY, last_start=lab.LAST_START,
-                            as_of=as_of, baseline=lab.BASELINE, candidate=lab.CANDIDATE,
-                            reports=lab.available_reports(as_of))
+def lab_scenario(actor: Auth, as_of: date | None = None):
+    with connection() as conn:
+        return lab_public.preview(conn, as_of)
 
 
 @app.get('/api/heuristic-lab/runs', response_model=list[lab.RunSummary])
@@ -520,8 +517,8 @@ def get_lab_run(id: int, actor: Auth):
 
 @app.post('/api/heuristic-lab/runs', status_code=201, response_model=lab.SavedRun)
 def create_lab_run(body: lab.RunInput[lab_rules.CaseAction], actor: Writer):
-    result = lab.replay(body).model_dump(mode='json')
     with connection() as conn:
+        result = lab_public.replay(conn, body).model_dump(mode='json')
         row = conn.execute('INSERT INTO workspace.heuristic_run (actor_id,result) VALUES (%s,%s) RETURNING *',
                            (actor.id, Jsonb(result))).fetchone()
         w.audit(conn, actor, 'heuristic_run.create', 'heuristic_run', row['id'],
