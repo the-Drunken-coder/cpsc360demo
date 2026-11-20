@@ -36,7 +36,13 @@ def main():
             reviews = list(csv.DictReader(f))
         pubs = {r['report_no']:r['publication_date'] for r in load_cohort(y)}
         schedules = json.loads((args.schedules / f'{y}.json').read_text())
-        print(json.dumps(dict(start_year=y, **{k:score(v,reviews,pubs,notices) for k,v in schedules.items()})))
+        reachable = score(pubs, reviews, pubs, notices)['notices']
+        print(json.dumps({
+            'start_year': y,
+            'publications': len(pubs),
+            'verified_reachable': reachable,
+            'queues': {k: score(v, reviews, pubs, notices) for k, v in schedules.items()},
+        }))
 
 
 if __name__ == '__main__':

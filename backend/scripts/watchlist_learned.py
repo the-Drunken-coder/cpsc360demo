@@ -1,6 +1,4 @@
 """Fit a report-level recall ranker using product and incident concepts, not product identities."""
-import csv
-import json
 import math
 import re
 from collections import defaultdict
@@ -11,8 +9,6 @@ from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import LogisticRegression
 
 from cpsc360.derive import manufacturer_key, product_model_key
-from scripts.watchlist_historical_check import load_cohort
-from scripts.watchlist_score import LEDGER
 
 
 # Only these common concepts, structured product types, and counts enter the classifier.
@@ -93,17 +89,3 @@ def fit_predict(train_rows, positive_report_ids, rows):
     model = LogisticRegression(class_weight='balanced', C=0.08, max_iter=400, solver='lbfgs',random_state=0)
     model.fit(matrix, [rid in ids for rid in train])
     return dict(zip(test,model.decision_function(vectorizer.transform(test.values())),strict=True))
-
-
-def training_data(modern_scores):
-    """Read reviewed historical pairs and modern reports.jsonl emitted by watchlist_score."""
-    modern = [json.loads(line) for line in modern_scores.read_text().splitlines()]
-    positives = {r['report_no'] for r in modern if r['strict']}
-    historical = []
-    for year, files in [(2020,['watchlist-2020-queue-review.csv']),
-                        (2022,['watchlist-historical-queue-review.csv','watchlist-historical-reachable.csv'])]:
-        historical.extend(load_cohort(year))
-        for file in files:
-            with LEDGER.with_name(file).open() as stream:
-                positives.update(r['report_no'] for r in csv.DictReader(stream) if r['strict']=='yes')
-    return historical + modern, positives
