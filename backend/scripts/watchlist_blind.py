@@ -10,7 +10,7 @@ from pathlib import Path
 from scripts.watchlist_historical_check import load_cohort, reviewed_pairs, score_queue
 from scripts.watchlist_queue_replay import incumbent
 from scripts.watchlist_score import LEDGER, read_json
-from scripts.watchlist_queue import schedule
+from scripts.watchlist_queue import protect_first_schedule, schedule
 from cpsc360.derive import manufacturer_key, product_model_key
 from scripts.watchlist_learned import fit_predict
 from scripts.watchlist_evidence import evidence
@@ -140,12 +140,15 @@ def main():
         a.output.write_text(json.dumps(dict(weights=best[1],development_gain=best[2],trials=len(trials)),indent=2)+'\n')
         return
     weights = json.loads(LOCK.read_text())['weights']
-    for y in (2016,2018,2014):
+    for y in (2012,2016,2018,2014):
         test = load_cohort(y)
         selected = choose(prepare(test,train_scores(rows,labels,test)),weights)
         old = {r['report_no']:date.fromisoformat(str(r['publication_date'])[:10]) for r in test if incumbent(r)}
         a.output.mkdir(exist_ok=True,parents=True)
-        (a.output/f'{y}.json').write_text(json.dumps({'old':old,'weekly':schedule(test),'challenger':selected},default=str,sort_keys=True))
+        queues = {'old':old,'weekly':schedule(test),'challenger':selected}
+        if y == 2012:
+            queues['protect_first'] = protect_first_schedule(test)
+        (a.output/f'{y}.json').write_text(json.dumps(queues,default=str,sort_keys=True))
 
 
 if __name__ == '__main__':

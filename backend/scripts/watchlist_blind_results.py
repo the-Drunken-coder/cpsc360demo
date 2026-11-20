@@ -30,8 +30,8 @@ def main():
     parser.add_argument('schedules',type=Path)
     args = parser.parse_args()
     notices = {n['RecallNumber']:date.fromisoformat(n['RecallDate'][:10]) for n in read_json(LEDGER)}
-    for y in (2014,2016,2018):
-        filename = 'watchlist-2014-review.csv' if y==2014 else 'watchlist-blind-review.csv'
+    for y in (2012,2014,2016,2018):
+        filename = f'watchlist-{y}-review.csv' if y in (2012,2014) else 'watchlist-blind-review.csv'
         with LEDGER.with_name(filename).open() as f:
             reviews = list(csv.DictReader(f))
         pubs = {r['report_no']:r['publication_date'] for r in load_cohort(y)}
