@@ -1,0 +1,127 @@
+{
+ "_comment": "Captured from POST /api/heuristic-lab/replay/window with rule \"Pressure washer\" (narrative contains pressure washer), trimmed to a few reports.",
+ "rules": [
+  {
+   "name": "Pressure washer",
+   "match": "all",
+   "conditions": [
+    {
+     "kind": "text",
+     "field": "narrative",
+     "operator": "contains_any",
+     "value": "pressure washer"
+    }
+   ],
+   "action": {
+    "kind": "watchlist"
+   }
+  }
+ ],
+ "arrival": {
+  "since": "2023-04-12",
+  "until": "2023-04-12",
+  "reports": [
+   {
+    "id": "20230303-7D5FE-2147349071",
+    "published": "2023-04-12",
+    "title": "Samsung ME21M706BAG",
+    "product": "Microwave Ovens",
+    "snippet": "Our microwave oven is turning on by itself. We did a [REDACTED] search to resolve the problem and found the following information. We discovered that this problem has occurred since 2018 with the sam…",
+    "rules": [],
+    "evidence": []
+   },
+   {
+    "id": "20230310-76A00-2147348870",
+    "published": "2023-04-12",
+    "title": "Pillowfort",
+    "product": "Dolls, Plush Toys, and Action Figures",
+    "snippet": "I don’t think it’s appropriate to market a weighed stuffed animal to a toddler. My 5 year old was gifted this on her birthday in February and she sleeps in the same room as my 2 year old. I think it…",
+    "rules": [],
+    "evidence": []
+   },
+   {
+    "id": "20230313-3EB24-2147348781",
+    "published": "2023-04-12",
+    "title": "Moderno",
+    "product": "Tableware & Accessories (excluding drinking glass,cups,mugs)",
+    "snippet": "I bought clear glass plates from Dollar Tree. The 105\" Moderno Dinner Plate. Upon use, when you scrape across them with a knife or fork, it scratches and puts little chards of glass in your food.",
+    "rules": [],
+    "evidence": []
+   },
+   {
+    "id": "20230316-6CAB4-2147348698",
+    "published": "2023-04-12",
+    "title": "Baby Breeza",
+    "product": "Electric Blenders",
+    "snippet": "I saw an 11 week old infant for follow up for poor weight gain today. The infant was taking appropriate volume of feedings, with normal voiding and stooling, and without other gastrointestinal sympto…",
+    "rules": [],
+    "evidence": []
+   },
+   {
+    "id": "20230317-9D96B-2147348684",
+    "published": "2023-04-12",
+    "title": "Dont now",
+    "product": "Building Sets",
+    "snippet": "Magnetics balls Kids were playing with magnetic balls at school simulating piercing. My daughter and friends simulated piercing in the nose. The magnets when up and magnet had to be removed at hospit…",
+    "rules": [],
+    "evidence": []
+   },
+   {
+    "id": "20230323-17880-2147348520",
+    "published": "2023-04-12",
+    "title": "COSORI NA",
+    "product": "Other Cookware",
+    "snippet": "the product is skipping while heating and doesnt heat the food i am scared it my explode",
+    "rules": [],
+    "evidence": []
+   },
+   {
+    "id": "20230324-B2A32-2147348506",
+    "published": "2023-04-12",
+    "title": "Ryobi RY142711VNM",
+    "product": "Sprayers, Not Elsewhere Classified",
+    "snippet": "My Ryobi Electric Pressure Washer model RY142711VNM washer exploded. I supplied water to the unit, plugged it in, released pressure from the waterline, pressed the power button, and the pressure wash…",
+    "rules": [
+     0
+    ],
+    "evidence": [
+     "narrative: contains any pressure washer"
+    ]
+   }
+  ],
+  "recalls": []
+ },
+ "announcement": {
+  "since": "2025-08-28",
+  "until": "2025-08-28",
+  "reports": [],
+  "recalls": [
+   {
+    "notice_no": "25452",
+    "announced": "2025-08-28",
+    "title": "TTI Outdoor Power Equipment Recalls RYOBI Pressure Washers Due to Projectile Hazard; Risk of Serious Injury",
+    "url": "https://www.cpsc.gov/Recalls/2025/TTI-Outdoor-Power-Equipment-Recalls-RYOBI-Pressure-Washers-Due-to-Projectile-Hazard-Risk-of-Serious-Injury",
+    "reports": [
+     {
+      "id": "20230324-B2A32-2147348506",
+      "published": "2023-04-12",
+      "title": "Ryobi RY142711VNM",
+      "flag_by": "2025-08-27"
+     },
+     {
+      "id": "20240513-C0663-2147339226",
+      "published": "2024-05-30",
+      "title": "Ryobi RY142300",
+      "flag_by": "2025-08-27"
+     },
+     {
+      "id": "20250114-83D5A-2147333912",
+      "published": "2025-01-31",
+      "title": "Ryobi RY142711VNM",
+      "flag_by": "2025-08-27"
+     }
+    ]
+   }
+  ]
+ }
+}

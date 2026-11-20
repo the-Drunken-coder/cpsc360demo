@@ -1,4 +1,6 @@
-import type { LabRun, LabRunInput, LabRunSummary, LabScenario } from "./heuristicLab";
+import type {
+  LabReplayBounds, LabReplayInput, LabReplayWindow, LabRun, LabRunInput, LabRunSummary, LabScenario,
+} from "./heuristicLab";
 import { compactFilters, toSearchParams } from "../domain/filters";
 import type {
   AIHazardResult, GoSettings, AuditEntry, BreakdownDimension, BreakdownResponse, Facets, Filters, IncidentDetail, IncidentPage, IncidentSort,
@@ -81,6 +83,8 @@ export const api = {
   labRuns: () => json<LabRunSummary[]>("GET", "/heuristic-lab/runs"),
   labRun: (id: string) => json<LabRun>("GET", `/heuristic-lab/runs/${encodeURIComponent(id)}`),
   runLab: (body: LabRunInput) => json<LabRun>("POST", "/heuristic-lab/runs", body),
+  labReplayBounds: () => json<LabReplayBounds>("GET", "/heuristic-lab/replay"),
+  labReplayWindow: (body: LabReplayInput) => json<LabReplayWindow>("POST", "/heuristic-lab/replay/window", body),
 
   goSettings: () => json<GoSettings>("GET", "/settings/opencode-go"),
   goModels: () => json<string[]>("GET", "/settings/opencode-go/models"),

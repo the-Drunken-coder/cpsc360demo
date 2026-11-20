@@ -10,6 +10,7 @@ import { SelectionProvider } from "./session/SelectionProvider";
 import { SessionProvider } from "./session/SessionProvider";
 import { AnalyticsView } from "./views/analytics/AnalyticsView";
 import { HeuristicLabView } from "./views/heuristicLab/HeuristicLabView";
+import { ReplayView } from "./views/heuristicLab/replay/ReplayView";
 import { CompareView } from "./views/compare/CompareView";
 import { ExplorerView } from "./views/explorer/ExplorerView";
 import { IncidentView } from "./views/incident/IncidentView";
@@ -92,6 +93,7 @@ function Shell() {
           <Route path="/investigations" element={<InvestigationsList />} />
           <Route path="/investigations/:id" element={<InvestigationView />} />
           <Route path="/investigations/:id/:tab" element={<InvestigationView />} />
+          <Route path="/heuristic-lab/replay" element={<ReplayView />} />
           <Route path="/heuristic-lab/:runId?" element={<HeuristicLabView />} />
           <Route path="/analytics" element={<AnalyticsView />} />
           <Route path="/source" element={<SourceView />} />

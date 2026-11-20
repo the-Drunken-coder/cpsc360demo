@@ -1,7 +1,7 @@
 import { Classes, Dialog, DialogBody, HTMLTable, KeyComboTag, useHotkeys, type HotkeyConfig } from "@blueprintjs/core";
 import { useMemo, useRef } from "react";
 
-interface HotkeyDef { combo: string; label: string; group: "Global" | "Explorer" | "Selection" }
+interface HotkeyDef { combo: string; label: string; group: "Global" | "Explorer" | "Selection" | "Replay" }
 
 export const HOTKEYS = {
   omnibar: { combo: "mod+k", label: "Jump to a report, investigation, saved search, or view", group: "Global" },
@@ -15,6 +15,9 @@ export const HOTKEYS = {
   compare: { combo: "c", label: "Compare selected reports", group: "Selection" },
   investigate: { combo: "i", label: "Add selection to an investigation", group: "Explorer" },
   related: { combo: "r", label: "Related reports for the focused report", group: "Explorer" },
+  playPause: { combo: "space", label: "Play or pause the replay", group: "Replay" },
+  flag: { combo: "f", label: "Flag the focused report", group: "Replay" },
+  dismiss: { combo: "d", label: "Dismiss the focused report", group: "Replay" },
 } as const satisfies Record<string, HotkeyDef>;
 
 export type HotkeyId = keyof typeof HOTKEYS;
@@ -52,7 +55,7 @@ export function useRegisteredHotkeys(handlers: HotkeyHandlers) {
 
 export function HotkeysHelp({ active, onClose }: { active: HotkeyConfig[]; onClose: () => void }) {
   const activeCombos = new Set(active.map((h) => h.combo));
-  const groups = ["Global", "Explorer", "Selection"] as const;
+  const groups = ["Global", "Explorer", "Selection", "Replay"] as const;
   return (
     <Dialog isOpen onClose={onClose} title="Keyboard shortcuts" icon="key-command" className="hotkeys-help">
       <DialogBody>
