@@ -33,15 +33,15 @@ export function useRegisteredHotkeys(handlers: HotkeyHandlers) {
       .map((id) => ({
         ...HOTKEYS[id],
         global: true,
-        preventDefault: id !== "open" && id !== "compare",
+        preventDefault: id !== "open" && id !== "compare" && id !== "playPause",
         onKeyDown: (event: KeyboardEvent) => {
           if (document.querySelector("[role=dialog], .bp5-omnibar")) return;
           if (id === "compare") {
             if (event.target instanceof Element && event.target.closest("select")) return;
             event.preventDefault();
           }
-          // Enter on a link, button, or select must keep its native action.
-          if (id === "open") {
+          // Enter or space on a link, button, or select must keep its native action.
+          if (id === "open" || id === "playPause") {
             if ((event.target as HTMLElement | null)?.closest("a, button, select, [role=button]")) return;
             event.preventDefault();
           }

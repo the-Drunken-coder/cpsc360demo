@@ -130,7 +130,7 @@ function ReplayWorkspace({ bounds }: { bounds: LabReplayBounds }) {
         const detail = editor.current?.querySelectorAll("details")[editing?.focus ?? -1];
         if (detail) {
           detail.open = true;
-          detail.querySelector("input")?.focus();
+          (detail.querySelector<HTMLInputElement>("input:invalid") ?? detail.querySelector("input"))?.focus();
         }
       }}>
       {editing && <form ref={editor} className="replay-rule-form" noValidate onSubmit={apply}>

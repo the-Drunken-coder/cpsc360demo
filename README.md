@@ -18,6 +18,8 @@ This is a prototype. It uses public data only, it has no connection to internal 
 
 8. **Heuristic Lab.** Compare two sets of triage rules on three months of SaferProducts.gov reports in publication-date order. Saved runs show recommendations, evidence, and links to the public reports in Explorer.
 
+**Replay** plays any date range of the snapshot forward by publication day. Rules tag reports as they arrive, F and D flag or dismiss by hand, and a scoreboard counts recalls flagged before CPSC announced them. Rule edits apply from the next replay day. Recalls come from `backend/cpsc360/replay-recalls.json.gz`, which links reports to later CPSC notices by listed model (the strict tier of the watchlist linkage, with archived reviews). Rebuild it after loading new reports with `.venv/bin/python -m scripts.replay_ledger` from `backend` (about two minutes).
+
 In the Heuristic Lab, **Add a rule** combines conditions to recommend a case action such as an in-depth investigation or IPT discussion. When several rules match a report at the same time, the first match supplies the recommendation. Earlier reports can inform rolling counts. Both arrival and end-of-replay checks recommend actions for reports published during the replay. The Lab uses the current public snapshot and simulates the recommendations.
 
 Every value carries its provenance:
