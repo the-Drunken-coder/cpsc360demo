@@ -21,7 +21,7 @@ def load_cohort(start_year):
         conn.row_factory = dict_row
         return conn.execute("""
             SELECT report_no, publication_date::text AS publication_date, manufacturer_name,
-                   brand, model, incident_description, product_description, product_type
+                   brand, model, incident_description, product_description, product_type, purchase_date::text AS purchase_date
             FROM source.incident WHERE publication_date BETWEEN %s AND %s
             ORDER BY publication_date, report_no
         """, (date(start_year,1,1), date(start_year+1,12,31))).fetchall()

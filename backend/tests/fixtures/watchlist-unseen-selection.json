@@ -1,0 +1,15 @@
+{
+  "weights": [
+    4,
+    1,
+    3,
+    5,
+    7
+  ],
+  "development_gain": [
+    1,
+    5,
+    -4
+  ],
+  "trials": 142
+}
