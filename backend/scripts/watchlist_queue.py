@@ -50,7 +50,7 @@ COMPONENTS = [(name, re.compile(product), re.compile(failure)) for name, product
 )]
 
 
-def schedule(rows, *, expanded=True, cooldown=30, adaptive=True, priority=0, rarity=1):
+def schedule(rows, *, expanded=True, cooldown=30, adaptive=True, priority=0, rarity=1, tie_seed=""):
     """On Sundays, spend review slots earned by incumbent flags, carrying unused slots forward."""
     weeks = defaultdict(list)
     for r in rows:
@@ -78,7 +78,7 @@ def schedule(rows, *, expanded=True, cooldown=30, adaptive=True, priority=0, rar
                 score += priority
             rid = r['report_no']
             keys = [(manufacturer_key(r['manufacturer_name']),n) for n in sorted(names)]
-            ranked.append((-score,hashlib.sha256(rid.encode()).digest(),rid,keys))
+            ranked.append((-score,hashlib.sha256((tie_seed + rid).encode()).digest(),rid,keys))
         for n in current:
             seen[n].append(sunday)
         for _,__,rid,keys in sorted(ranked):
@@ -94,3 +94,42 @@ def schedule(rows, *, expanded=True, cooldown=30, adaptive=True, priority=0, rar
 
 def review_queue(rows):
     return set(schedule(rows))
+
+
+def protect_first_schedule(rows):
+    """Protect the first incumbent alert; only repeated incumbent alerts fund extra reviews."""
+    weeks = defaultdict(list)
+    for r in rows:
+        day = date.fromisoformat(str(r['publication_date'])[:10])
+        weeks[day + timedelta(days=6-day.weekday())].append((day, r))
+    credits = 0
+    selected = {}
+    last = {}
+    for sunday, batch in sorted(weeks.items()):
+        extras = []
+        for day, r in sorted(batch, key=lambda item:(item[0],item[1]['report_no'])):
+            key = manufacturer_key(r['manufacturer_name'])
+            rid = r['report_no']
+            model = product_model_key(r['model'],r['brand'],r['manufacturer_name'])
+            incumbent = signals(r) if model else set()
+            if incumbent:
+                keys = [(key, n) for n in incumbent]
+                if all(k in last and (day-last[k]).days < 30 for k in keys):
+                    credits += 1
+                else:
+                    selected[rid] = day
+                    last.update(dict.fromkeys(keys,day))
+            else:
+                evidence = _matches(r,True)
+                if evidence:
+                    score,names = evidence
+                    extras.append((-score,hashlib.sha256(rid.encode()).digest(),rid,[(key,n) for n in names]))
+        for _,__,rid,keys in sorted(extras):
+            if not credits:
+                break
+            if all(k in last and (sunday-last[k]).days < 30 for k in keys):
+                continue
+            credits -= 1
+            selected[rid] = sunday
+            last.update(dict.fromkeys(keys,sunday))
+    return selected
