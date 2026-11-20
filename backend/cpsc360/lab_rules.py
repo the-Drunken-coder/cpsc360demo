@@ -276,14 +276,18 @@ def matches(condition: Condition, facts: dict, history: History, day: date,
     return f'{count} matching {condition.measure} in {condition.window_days} days ({", ".join(ids) or "none"})' if matched else None
 
 
+def rule_evidence(rule: Rule, facts: dict, history: History, day: date,
+                  trigger: Literal['arrival', 'end'] = 'arrival') -> list[str] | None:
+    """Return the evidence for each matched condition when the rule matches, otherwise None."""
+    evidence = [reason for condition in rule.conditions if (reason := matches(condition, facts, history, day, trigger))]
+    return evidence if evidence and (rule.match == 'any' or len(evidence) == len(rule.conditions)) else None
+
+
 def apply_rules(rules: list[Rule], facts: dict, history: History, day: date,
                 trigger: Literal['arrival', 'end'] = 'arrival') -> list[Match]:
     result = []
     for rule in rules:
-        if rule.trigger != trigger:
-            continue
-        evidence = [reason for condition in rule.conditions if (reason := matches(condition, facts, history, day, trigger))]
-        if evidence and (rule.match == 'any' or len(evidence) == len(rule.conditions)):
+        if rule.trigger == trigger and (evidence := rule_evidence(rule, facts, history, day, trigger)):
             result.append(Match(rule=rule.name, action=rule.action, evidence=evidence))
     suppressed = {':'.join(part.strip() for part in item.action.value.casefold().split(':', 1))
                   for item in result if isinstance(item.action, LegacyAction) and item.action.kind == 'suppress'}

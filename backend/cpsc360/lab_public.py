@@ -68,8 +68,8 @@ def to_report(row: dict) -> lab.Report:
     )
 
 
-def load_reports(conn, earliest: date, end: date) -> list[lab.Report]:
-    rows = conn.execute('''
+def load_rows(conn, earliest: date, end: date) -> list[dict]:
+    return conn.execute('''
         SELECT i.report_no, i.publication_date, i.current_sha256, i.product_type, i.product_description,
                i.product_code, i.incident_description, i.severity, i.victim_age, i.manufacturer_name, i.brand, i.model, i.retailer,
                s.rank AS severity_rank, s.is_injury, n.manufacturer_key,
@@ -80,7 +80,10 @@ def load_reports(conn, earliest: date, end: date) -> list[lab.Report]:
          WHERE i.publication_date BETWEEN %s AND %s
          ORDER BY i.publication_date, i.report_no
     ''', (earliest, end)).fetchall()
-    return [to_report(row) for row in rows]
+
+
+def load_reports(conn, earliest: date, end: date) -> list[lab.Report]:
+    return [to_report(row) for row in load_rows(conn, earliest, end)]
 
 
 def replay(conn, request: lab.RunInput[lab_rules.CaseAction]) -> lab.RunResult:
