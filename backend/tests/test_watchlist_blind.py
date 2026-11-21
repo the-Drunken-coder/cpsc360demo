@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from scripts.watchlist_blind import choose
+from scripts.watchlist_blind import choose, training_fold
 from scripts.watchlist_blind_results import score
 
 
@@ -21,3 +21,11 @@ def test_earlier_warning_prevents_credit_for_a_later_formal_recall():
     reviews = [{'strict':'yes','report_no':'a','notice_no':'notice','first_public_action':'2018-03-10'}]
     assert score({'a':'2018-03-10'},reviews,pubs,notices)['notices'] == []
     assert score({'a':'2018-03-09'},reviews,pubs,notices)['notices'] == ['notice']
+
+def test_shared_recall_removes_the_entire_training_report():
+    rows = {2020: [{'report_no': rid} for rid in ('shared', 'other', 'negative')],
+            2022: [{'report_no': 'holdout'}]}
+    labels = {2020: [('shared', 'A'), ('shared', 'B'), ('other', 'C')], 2022: [('holdout', 'A')]}
+    training, positives = training_fold(rows, labels, 2022)
+    assert training == {2020: [{'report_no': 'other'}, {'report_no': 'negative'}]}
+    assert positives == {2020: [('other', 'C')]}

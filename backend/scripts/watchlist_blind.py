@@ -92,6 +92,17 @@ def choose(weeks, weights):
     return selected
 
 
+def training_fold(rows, labels, held_out_year, original_folds=False):
+    held_out_notices = {notice for _, notice in labels[held_out_year]}
+    training_labels = {t: pairs for t, pairs in labels.items() if t != held_out_year}
+    excluded = {rid for pairs in training_labels.values() for rid, notice in pairs
+                if not original_folds and notice in held_out_notices}
+    return (
+        {t: [r for r in rows[t] if r['report_no'] not in excluded] for t in training_labels},
+        {t: [(rid, n) for rid, n in pairs if rid not in excluded] for t, pairs in training_labels.items()},
+    )
+
+
 def train_scores(rows, labels, test):
     train = [r for y in rows for r in rows[y]]
     positive = {rid for pairs in labels.values() for rid,_ in pairs}
@@ -109,13 +120,16 @@ def main():
     p.add_argument('mode',choices=['fit','blind'])
     p.add_argument('--output',type=Path, required=True)
     p.add_argument('--modern', type=Path, required=True, help='2024–25 reports.jsonl from watchlist_score')
+    p.add_argument('--original-folds', action='store_true',
+                   help='Reproduce the pre-registered weight search including shared recall IDs.')
     a = p.parse_args()
     rows,labels = sources(a.modern)
     notices = {n['RecallNumber']:date.fromisoformat(n['RecallDate'][:10]) for n in read_json(LEDGER)}
     if a.mode=='fit':
         prepared = {}
         for y in rows:
-            pred = train_scores({t:v for t,v in rows.items() if t!=y},{t:v for t,v in labels.items() if t!=y},rows[y])
+            training, training_labels = training_fold(rows, labels, y, a.original_folds)
+            pred = train_scores(training, training_labels, rows[y])
             prepared[y] = prepare(rows[y],pred)
         pubs = {y:{r['report_no']:date.fromisoformat(str(r['publication_date'])[:10]) for r in cohort} for y,cohort in rows.items()}
         old_hits = {y:comparison(rows[y],{},notices,labels[y])['old']['distinct_notices'] for y in rows}

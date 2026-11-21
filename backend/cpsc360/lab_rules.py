@@ -212,7 +212,8 @@ class History:
         return sorted(reports.values(), key=lambda report: (report['available_on'], report['id']))
 
 
-def matches(condition: Condition, facts: dict, history: History, day: date) -> str | None:
+def matches(condition: Condition, facts: dict, history: History, day: date,
+            trigger: Literal['arrival', 'end'] = 'arrival') -> str | None:
     if isinstance(condition, TextCondition):
         value = facts.get(condition.field)
         values = hazards(facts) if condition.field == 'hazard' else (value,) if value is not None else ()
@@ -266,7 +267,8 @@ def matches(condition: Condition, facts: dict, history: History, day: date) -> s
         return f'{elapsed} days since the latest matching report ({last})' if elapsed >= condition.days else None
     cutoff = day - timedelta(days=condition.window_days - 1)
     items = [item for item in history.since(condition.group, keys, cutoff)
-             if condition.filter == 'all' or item.get(condition.filter) is True]
+             if (trigger == 'end' or item['available_on'] < day or item['id'] == facts['id'])
+             and (condition.filter == 'all' or item.get(condition.filter) is True)]
     ids = [item['id'] for item in items]
     manufacturers = {item.get('manufacturer_key') or item.get('manufacturer') for item in items}
     count = len(ids) if condition.measure == 'reports' else len(manufacturers - {None, ''})
@@ -280,7 +282,7 @@ def apply_rules(rules: list[Rule], facts: dict, history: History, day: date,
     for rule in rules:
         if rule.trigger != trigger:
             continue
-        evidence = [reason for condition in rule.conditions if (reason := matches(condition, facts, history, day))]
+        evidence = [reason for condition in rule.conditions if (reason := matches(condition, facts, history, day, trigger))]
         if evidence and (rule.match == 'any' or len(evidence) == len(rule.conditions)):
             result.append(Match(rule=rule.name, action=rule.action, evidence=evidence))
     suppressed = {':'.join(part.strip() for part in item.action.value.casefold().split(':', 1))

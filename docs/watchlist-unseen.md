@@ -12,6 +12,10 @@ We tested 142 combinations with the classifier trained on the other two developm
 
 Each Sunday the challenger earns as many slots as the incumbent flagged reports that week. It considers this week's reports and the previous week's backlog. Rank by four times the eighth power of the classifier's arrival-time score percentile, plus narrative/acquisition evidence, plus three per previous same-model report in 120 days (maximum two), plus five for an incumbent flag. Once a maker/model gets a review, suppress its duplicates for 120 days. Break ties by hash of report ID. Train the final classifier on all three development blocks. It sees product categories and incident concepts, with names and model codes used only for identity and recurrence.
 
+The original development search held out publication years. One recall (22153) had earlier reports in both the 2020 and 2022 blocks. Three (24110, 24335, 24377) crossed the 2022 and 2024 blocks. The weekly detector’s 2022–23 check therefore reused some target recalls from its development years. Neither queue caught any of those three in that check. Across the four earlier blocks from 2012 through 2019, none of the verified reachable notices appeared in classifier training labels.
+
+Repeating all 142 combinations after excluding every training report linked to a held-out recall selected the same weights and development gains (+1, +5, −4). This sensitivity check leaves the frozen challenger and its headline results unchanged. Omit `--original-folds` in the reproduction command to run this check.
+
 ## Additional replication decision
 
 After seeing the 2016–19 comparison, select the **unchanged weekly queue** from commit `9f2722f` for a separate 2012–13 check, against the unchanged incumbent. This is a follow-up selection, not a change to the frozen primary challenger. No 2012–13 outcomes informed this decision. Run the previously fixed protection variant and the supervised challenger there for comparison only. Report the result whichever method wins.
@@ -43,7 +47,7 @@ Run from `backend/` with the incident database loaded and project dependencies i
 
 ```sh
 python -m scripts.watchlist_score --output /tmp/watchlist
-OPENBLAS_NUM_THREADS=1 python -m scripts.watchlist_blind fit --modern /tmp/watchlist/reports.jsonl --output /tmp/selection.json
+OPENBLAS_NUM_THREADS=1 python -m scripts.watchlist_blind fit --original-folds --modern /tmp/watchlist/reports.jsonl --output /tmp/selection.json
 cmp /tmp/selection.json tests/fixtures/watchlist-unseen-selection.json
 OPENBLAS_NUM_THREADS=1 python -m scripts.watchlist_blind blind --modern /tmp/watchlist/reports.jsonl --output /tmp/watch-blind-out
 python -m scripts.watchlist_blind_results /tmp/watch-blind-out

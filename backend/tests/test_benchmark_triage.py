@@ -19,7 +19,7 @@ def test_forward_labels_exclude_same_day_and_purge_split_boundary():
                                          'window_days': 2, 'threshold': 2}])
     hits, events, periods = collect(reports, [rule])
     assert periods == [set(), {'first', 'second', 'same day'}]
-    assert hits == [{'first', 'second', 'same day'}]
+    assert hits == [{'first', 'second'}]
     assert set(events) == {'first', 'second'}
     assert len(set(events.values())) == 1
     assert abs(expected_events(periods[1], events, 1) - 2 / 3) < 1e-10

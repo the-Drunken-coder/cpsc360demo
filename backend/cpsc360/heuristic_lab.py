@@ -12,7 +12,7 @@ from . import lab_rules
 FIRST_DAY = date(2025, 1, 1)
 LAST_START = date(2025, 3, 31)
 SCENARIO = 'product-safety-v2'
-EVALUATOR = 'product-rules-v2'
+EVALUATOR = 'product-rules-v3'
 
 
 class Rules[ActionT: lab_rules.Action](BaseModel):
