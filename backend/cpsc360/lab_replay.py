@@ -8,6 +8,7 @@ in the browser, so the server keeps no replay state.
 
 import gzip
 import json
+import re
 from collections import defaultdict
 from datetime import date, timedelta
 from functools import cache
@@ -22,12 +23,17 @@ from . import heuristic_lab as lab, lab_public, lab_rules
 LEDGER_PATH = Path(__file__).with_name('replay-recalls.json.gz')
 MAX_WINDOW_DAYS = 62
 SNIPPET_CHARS = 200
+WAVE_DAYS = 365
+WAVE_OVERLAP = 0.3
+TITLE_FILLER = frozenset('a an and the of for to by with in on at from due recall recalls recalled recalling alert '
+                         'expands reannounces announces inc llc co company corp brand'.split())
 
 
 class Notice(NamedTuple):
     announced: date
     title: str
     url: str
+    wave: str  # The first notice of its wave of near-identical notices.
 
 
 class Ledger(NamedTuple):
@@ -38,6 +44,47 @@ class Ledger(NamedTuple):
     reports: dict[str, list[tuple[str, date]]]
 
 
+def title_parts(title: str) -> tuple[str, frozenset[str]]:
+    """Split a notice title into its hazard clause (after "Due to") and the product words before it."""
+    title = title.lower().replace('?', ' ')
+    due = re.search(r'\bdue\s+to\b', title)
+    if due is None:
+        return '', frozenset()
+    clause = re.sub(r'\(.*?\)|;.*|serious|risk of|\bthe\b', '', title[due.end():])
+    hazard = ' '.join(word[:-1] if word.endswith('s') and len(word) > 3 else word for word in re.findall(r'[a-z]+', clause))
+    return hazard, frozenset(word for word in re.findall(r'[a-z]+', title[:due.start()])
+                             if word not in TITLE_FILLER and len(word) > 2)
+
+
+def recall_waves(notices: dict[str, tuple[date, str]]) -> dict[str, str]:
+    """Group notices into waves: same hazard clause, overlapping product words, announced within a year.
+
+    A wave is one pattern CPSC acted on many times, such as 21 wintergreen-oil packaging notices
+    in 2019-2020. Scoring counts each wave once so one rule can't collect a point per notice.
+    """
+    ordered = sorted(notices, key=lambda no: (notices[no][0], no))
+    parts = {no: title_parts(notices[no][1]) for no in ordered}
+    parent = {no: no for no in ordered}
+
+    def root(no: str) -> str:
+        while parent[no] != no:
+            no = parent[no] = parent[parent[no]]
+        return no
+
+    for position, first in enumerate(ordered):
+        hazard, words = parts[first]
+        for second in ordered[position + 1:]:
+            if (notices[second][0] - notices[first][0]).days > WAVE_DAYS:
+                break
+            other_hazard, other_words = parts[second]
+            if hazard and hazard == other_hazard and words and other_words \
+                    and len(words & other_words) / len(words | other_words) >= WAVE_OVERLAP:
+                parent[root(second)] = root(first)
+    # Name each wave after its earliest notice, which `ordered` visits first.
+    names: dict[str, str] = {}
+    return {no: names.setdefault(root(no), no) for no in ordered}
+
+
 @cache
 def ledger() -> Ledger:
     """The strict-tier recall links built by `scripts.replay_ledger`."""
@@ -46,7 +93,9 @@ def ledger() -> Ledger:
     reports: dict[str, list[tuple[str, date]]] = defaultdict(list)
     for report_no, notice_no, known in raw['links']:
         reports[notice_no].append((report_no, date.fromisoformat(known) - timedelta(days=1)))
-    notices = {no: Notice(date.fromisoformat(n['announced']), n['title'], n['url']) for no, n in raw['notices'].items()}
+    announced = {no: (date.fromisoformat(n['announced']), n['title']) for no, n in raw['notices'].items()}
+    waves = recall_waves(announced)
+    notices = {no: Notice(day, title, raw['notices'][no]['url'], waves[no]) for no, (day, title) in announced.items()}
     return Ledger(raw['method'], date.fromisoformat(raw['snapshot_last']), notices, dict(reports))
 
 
@@ -98,6 +147,7 @@ class LinkedReport(BaseModel):
 
 class ReplayRecall(BaseModel):
     notice_no: str
+    wave: str = Field(description='The first notice of its wave. Scoring counts a wave once.')
     announced: date
     title: str
     url: str
@@ -171,7 +221,7 @@ def recalls(conn, start: date, since: date, until: date) -> list[ReplayRecall]:
                          key=lambda report: (report.published, report.id))
         if reports:
             notice = links.notices[no]
-            result.append(ReplayRecall(notice_no=no, announced=day, title=notice.title, url=notice.url, reports=reports))
+            result.append(ReplayRecall(notice_no=no, wave=notice.wave, announced=day, title=notice.title, url=notice.url, reports=reports))
     return result
 
 

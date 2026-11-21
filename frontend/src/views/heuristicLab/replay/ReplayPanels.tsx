@@ -1,7 +1,9 @@
 import { Button, HTMLSelect, Spinner } from "@blueprintjs/core";
 import { useEffect, useRef, useState } from "react";
 import type { LabReplayLinkedReport } from "../../../api/heuristicLab";
-import { daysBetween, type FeedItem, type Mark, type RecallOutcome, type ReplayScore } from "../../../domain/replay";
+import {
+  daysBetween, type FeedItem, LEAD_CAP_DAYS, type Mark, type RecallOutcome, type ReplayScore, WEEKLY_BUDGET,
+} from "../../../domain/replay";
 import type { RuleDraft } from "../TriageEditor";
 import { ruleLabel } from "../TriageEditor";
 import { SPEEDS, type Speed } from "./useReplayPlayer";
@@ -160,8 +162,9 @@ export function ScoreColumn({ score }: { score: ReplayScore }) {
     ["Recalls caught early", score.caught.toLocaleString(), "good"],
     ["Recalls missed", score.missed.toLocaleString(), "bad"],
     ["Median days early", score.medianLead === null ? "–" : score.medianLead.toLocaleString()],
+    [`Flags per week (budget ${WEEKLY_BUDGET})`, score.flagsPerWeek.toFixed(1), score.flagsPerWeek > WEEKLY_BUDGET ? "bad" : undefined],
     ["Flags, no recall yet", score.flagsWithoutRecall.toLocaleString()],
-    ["Flag precision", score.precision === null ? "–" : PERCENT.format(score.precision)],
+    ["Precision, at least", score.precision === null ? "–" : PERCENT.format(score.precision)],
   ];
   return <section className="replay-col" aria-label="Score">
     <header className="replay-col-head"><h2>Score</h2></header>
@@ -170,7 +173,11 @@ export function ScoreColumn({ score }: { score: ReplayScore }) {
         <dt>{label}</dt><dd className="mono" data-tone={tone}>{value}</dd>
       </div>)}
     </dl>
-    <p className="replay-note">Recalls are CPSC notices that list a reported model. A flag counts when it comes before the announcement.</p>
+    <p className="replay-note">
+      Recalls are CPSC notices that list a reported model, and near-identical notices count once. A flag counts
+      when it comes before the announcement, for up to {LEAD_CAP_DAYS} days of lead. Flags with no recall may still
+      be hazards CPSC missed, so precision is a floor.
+    </p>
   </section>;
 }
 

@@ -146,6 +146,8 @@ export interface LabReplayLinkedReport {
 
 export interface LabReplayRecall {
   notice_no: string;
+  /** The first notice of its wave of near-identical notices. Scoring counts a wave once. */
+  wave: string;
   announced: string;
   title: string;
   url: string;

@@ -47,6 +47,10 @@ export type ReplayAction =
   | { type: "reset"; start: string; end: string };
 
 export const FEED_DAYS = 7;
+/** Leads count up to a year, so one early flag on a long-lived model can't dominate the median. */
+export const LEAD_CAP_DAYS = 365;
+/** Flags a reviewer can work through each week, the recall benchmark's budget. */
+export const WEEKLY_BUDGET = 3;
 
 export function addDays(day: string, days: number): string {
   const date = new Date(`${day}T00:00:00Z`);
@@ -140,13 +144,16 @@ export function replayReducer(state: ReplayState, action: ReplayAction): ReplayS
 }
 
 export interface ReplayScore {
+  /** Recall waves (near-identical notices count once) with a flag before the announcement. */
   caught: number;
   missed: number;
+  /** Median of each caught wave's best lead, capped at LEAD_CAP_DAYS. */
   medianLead: number | null;
   flags: number;
-  /** Flagged reports that no announced recall covers. */
+  flagsPerWeek: number;
+  /** Flagged reports that no announced recall covers. They may still be real hazards CPSC never acted on. */
   flagsWithoutRecall: number;
-  /** Share of flags credited to an announced recall. */
+  /** Share of flags credited to an announced recall, a floor on true precision. */
   precision: number | null;
 }
 
@@ -158,7 +165,14 @@ function median(values: number[]): number | null {
 }
 
 export function score(state: ReplayState): ReplayScore {
-  const leads = state.outcomes.flatMap((outcome) => outcome.kind === "caught" ? [outcome.lead] : []);
+  // Each wave's best capped lead, or null while none of its notices was caught.
+  const waves = new Map<string, number | null>();
+  for (const outcome of state.outcomes) {
+    const lead = outcome.kind === "caught" ? Math.min(outcome.lead, LEAD_CAP_DAYS) : null;
+    const best = waves.get(outcome.recall.wave) ?? null;
+    waves.set(outcome.recall.wave, lead === null ? best : Math.max(lead, best ?? lead));
+  }
+  const leads = [...waves.values()].filter((lead) => lead !== null);
   let flags = 0;
   let hits = 0;
   let withoutRecall = 0;
@@ -169,11 +183,13 @@ export function score(state: ReplayState): ReplayScore {
     if (flagBy === undefined) withoutRecall += 1;
     else if (mark.on <= flagBy) hits += 1;
   }
+  const weeks = state.day === null ? 0 : (daysBetween(state.start, state.day) + 1) / 7;
   return {
     caught: leads.length,
-    missed: state.outcomes.length - leads.length,
+    missed: waves.size - leads.length,
     medianLead: median(leads),
     flags,
+    flagsPerWeek: weeks ? flags / weeks : 0,
     flagsWithoutRecall: withoutRecall,
     precision: flags ? hits / flags : null,
   };

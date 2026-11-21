@@ -56,6 +56,7 @@ def test_a_rule_flag_on_arrival_catches_a_later_recall_with_its_lead(client, vie
     assert not any(recall['notice_no'] == RYOBI_NOTICE for recall in before['recalls'])
     announced = window(client, viewer, '2025-08-01', '2025-08-31', [RYOBI_RULE])
     recall = next(r for r in announced['recalls'] if r['notice_no'] == RYOBI_NOTICE)
+    assert recall['wave'] == RYOBI_NOTICE
     assert recall['announced'] == '2025-08-28'
     covered = {r['id']: r for r in recall['reports']}
     assert covered[RYOBI_REPORT]['flag_by'] == '2025-08-27'

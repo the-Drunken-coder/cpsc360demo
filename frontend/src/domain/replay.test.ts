@@ -39,7 +39,20 @@ describe("replay scoring", () => {
     expect(outcome?.kind).toBe("caught");
     expect(outcome?.kind === "caught" && { lead: outcome.lead, report: outcome.report.id, by: outcome.by })
       .toEqual({ lead: 869, report: RYOBI, by: { kind: "rule", ruleId: RULE.id, name: RULE.name } });
-    expect(score(state)).toMatchObject({ caught: 1, missed: 0, medianLead: 869, flags: 1, flagsWithoutRecall: 0, precision: 1 });
+    // The toast keeps the real lead; the score caps it at a year.
+    expect(score(state)).toMatchObject({ caught: 1, missed: 0, medianLead: 365, flags: 1, flagsWithoutRecall: 0, precision: 1 });
+  });
+
+  it("counts a wave of near-identical notices once", () => {
+    const days = arrivals([RULE]);
+    const announcement = days.get("2025-08-28");
+    const [notice] = announcement?.recalls ?? [];
+    if (!announcement || !notice) throw new Error("Fixture lost its announcement");
+    const sibling = { ...notice, notice_no: "99999", wave: notice.wave };
+    days.set("2025-08-28", { ...announcement, recalls: [notice, sibling] });
+    const state = play(initialReplay("2023-04-01", "2025-09-30"), "2025-08-28", days);
+    expect(state.outcomes).toHaveLength(2);
+    expect(score(state)).toMatchObject({ caught: 1, missed: 0 });
   });
 
   it("credits a hand flag from the day it was made", () => {
