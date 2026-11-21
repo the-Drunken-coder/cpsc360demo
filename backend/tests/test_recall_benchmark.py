@@ -104,8 +104,9 @@ def test_rules_score_through_the_lab_engine(conn, known):
 
 def test_words_in_report_text_that_look_like_codes_do_not_link_recalls():
     # A Hampton Bay table lamp report says "3-way", like a Target floor lamp notice and a lamp socket notice.
-    # An iPhone report says "256GB", like a MacBook Pro notice.
-    for report_no in ('20110519-FBDCE-2147479025', '20170224-7D0A7-2147405766'):
+    # An iPhone report says "256GB", like a MacBook Pro notice. A Kenmore range's "790" is the Sears
+    # prefix on every Electrolux-made Kenmore, not a model.
+    for report_no in ('20110519-FBDCE-2147479025', '20170224-7D0A7-2147405766', '20120807-471DC-2147465009'):
         assert all(report_no not in {linked for linked, _ in covered} for covered in lab_replay.ledger().reports.values())
 
 
@@ -117,6 +118,8 @@ def test_a_reannounced_recall_is_one_wave_measured_from_the_first_notice(known):
     # Textron's crash recall expansion shares vehicles with its fire recall, which stays its own wave with its reports.
     assert notices['25701'].wave == notices['24709'].wave != notices['24229'].wave
     assert lab_replay.ledger().reports['24229']
+    # Electrolux's dual-fuel range recall only matched on "790", so it no longer joins the reannounced electric range recall.
+    assert '15143' not in notices and notices['24235'].wave == '24235'
     result = bench.score(known, {'20120810-D8FCC-2147464905': 1.0}, 'train')
     assert [(catch.notice_no, catch.lead_days) for catch in result.caught] == [('13283', 361)]
 

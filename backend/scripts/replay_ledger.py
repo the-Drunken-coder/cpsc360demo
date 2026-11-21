@@ -42,8 +42,12 @@ def model_like(code):
             and not PART_CODE.fullmatch(code))
 
 
-def text_only_match(report, reason):
-    """Whether every code a strict link matched came from the report's text and none reads like a model."""
+def weak_match(report, reason):
+    """Whether every code a strict link matched is too generic to name the reported model.
+
+    That is a code from the report's text that doesn't read like a model, or a model of two or
+    three digits, such as "790", the prefix Sears puts on every Kenmore range Electrolux makes.
+    """
     # `link_reports` writes the reason as "[org] <matched codes> <product words> <hazard words>".
     words = reason.split()
     if words[:1] == ['org']:
@@ -51,8 +55,12 @@ def text_only_match(report, reason):
     matched = set(words[0].split(',')) if words else set()
     text = identifiers(' '.join((report['product_description'] or '', report['incident_description'] or '')))
     codes, numeric, named = model_terms({**report, 'product_description': '', 'incident_description': ''})
-    return bool(matched) and all(code in text and code not in codes | numeric | named and not model_like(code)
-                                 for code in matched)
+
+    def weak(code):
+        if code.isdigit() and len(code) <= 3:
+            return True
+        return code in text and code not in codes | numeric | named and not model_like(code)
+    return bool(matched) and all(weak(code) for code in matched)
 
 
 def reviews():
@@ -78,7 +86,7 @@ def build(reports, notices, verdicts, public_on, earlier):
     by_report = {r['report_no']: r for r in reports}
     for candidate in candidates:
         pair = candidate['report_no'], candidate['notice_no']
-        if candidate['strict'] and pair not in verdicts and text_only_match(by_report[pair[0]], candidate['reason']):
+        if candidate['strict'] and pair not in verdicts and weak_match(by_report[pair[0]], candidate['reason']):
             links[pair[0]].strict.pop(pair[1], None)
     for action in earlier:
         if action['report_no'] in links and date.fromisoformat(action['date']) <= published[action['report_no']]:
