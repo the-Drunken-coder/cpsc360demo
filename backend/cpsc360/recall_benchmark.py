@@ -1,7 +1,7 @@
 """Score any report ranker, rules or a trained model, on catching CPSC recalls early under a review budget.
 
-A system gives every report a score. Each publication week, the top `budget` reports with a
-positive score are flagged when the week closes. A recall wave is caught when a flagged report
+A system gives reports a score, and a report with none abstains. Each publication week, the top
+`budget` scored reports are flagged when the week closes. A recall wave is caught when a flagged report
 is linked to one of its notices before CPSC acted (the strict recall ledger). The main number
 is caught waves at a fixed budget, next to what random flags at the same weekly rate catch.
 
@@ -16,8 +16,9 @@ import random
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from datetime import date, timedelta
-from math import sqrt
+from math import isfinite, sqrt
 from pathlib import Path
+from statistics import median
 from typing import Literal, NamedTuple
 
 from pydantic import BaseModel
@@ -112,13 +113,15 @@ def truths(conn, reviews: Iterable[Review] | None = None) -> dict[str, Truth]:
 
 
 def labels_as_of(day: date) -> set[str]:
-    """Reports linked to a recall CPSC had acted on before `day`: the only labels a model trained that day could see.
+    """Reports linked to a recall notice published before `day`: the only labels a model trained that day could see.
 
     Training on today's labels would leak: a model would learn that a model number is risky
-    from a recall announced years after the reports it is scored on.
+    from a recall announced years after the reports it is scored on. The date is the notice's,
+    not an earlier warning's, since the notice is what lists the exact models.
     """
-    return {report_no for covered in lab_replay.ledger().reports.values()
-            for report_no, flag_by in covered if flag_by + timedelta(days=1) < day}
+    ledger = lab_replay.ledger()
+    return {report_no for notice_no, covered in ledger.reports.items() if ledger.notices[notice_no].announced < day
+            for report_no, _ in covered}
 
 
 def in_split(known: Mapping[str, Truth], split: Split) -> dict[str, Truth]:
@@ -127,13 +130,13 @@ def in_split(known: Mapping[str, Truth], split: Split) -> dict[str, Truth]:
 
 
 def flag(reports: Mapping[str, Truth], scores: Mapping[str, float], budget: int) -> dict[str, date]:
-    """The top `budget` positive scores of each publication week, flagged on the week's last day.
+    """The top `budget` scored reports of each publication week, flagged on the week's last day.
 
-    Equal scores are broken by report number so a run is reproducible.
+    A report with no score abstains. Equal scores are broken by report number so a run is reproducible.
     """
     weeks: dict[date, list[tuple[float, str]]] = defaultdict(list)
     for report_no, truth in reports.items():
-        if (value := scores.get(report_no, 0.0)) > 0:
+        if (value := scores.get(report_no)) is not None and isfinite(value):
             weeks[week_end(truth.published)].append((-value, report_no))
     return {report_no: end for end, ranked in weeks.items() for _, report_no in sorted(ranked)[:budget]}
 
@@ -148,12 +151,12 @@ class Catch(BaseModel):
 
 class Precision(BaseModel):
     floor: float | None  # recalled flags / flags that are not too recent to judge
-    recalled: int
-    unrecalled: int
+    recalled: int  # flags made before a recall of the report's model, the only ones that count as hits
+    unrecalled: int  # flags on reports no recall covers
     censored: int  # unrecalled flags too recent for "no recall yet" to mean much
     reviewed: int
     escalate: int
-    estimate: float | None  # counts reviewed-escalate flags as correct, extrapolated to all unrecalled flags
+    estimate: float | None  # the floor, plus the reviewed escalate rate applied to unrecalled flags old enough to judge
     low: float | None
     high: float | None
 
@@ -228,24 +231,27 @@ def score(known: Mapping[str, Truth], scores: Mapping[str, float], split: Split,
         split=split, budget=budget, weeks=round(span, 1), flags=len(flagged), flags_per_week=round(len(flagged) / span, 2),
         reachable_waves=len(eligible), caught_waves=len(best), random_waves=round(random_waves, 2),
         lift=round(len(best) / random_waves, 2) if random_waves else None,
-        median_lead_days=leads[len(leads) // 2] if leads else None,
-        precision=precision([reports[report_no] for report_no in flagged]),
+        median_lead_days=round(median(leads)) if leads else None,
+        precision=precision([(reports[report_no], end) for report_no, end in flagged.items()]),
         caught=sorted(best.values(), key=lambda catch: (-catch.lead_days, catch.wave)),
     )
 
 
-def precision(flags: list[Truth]) -> Precision:
-    recalled = sum(bool(truth.links) for truth in flags)
-    unrecalled = [truth for truth in flags if not truth.links]
+def precision(flags: list[tuple[Truth, date]]) -> Precision:
+    """Precision of (report, flag day) pairs. A flag after the recall deadline is a miss, like a wrong one."""
+    recalled = sum(any(end <= flag_by for _, flag_by in truth.links) for truth, end in flags)
+    unrecalled = [truth for truth, _ in flags if not truth.links]
     censored = sum(truth.censored for truth in unrecalled)
     judged = len(flags) - censored
     reviewed = [truth for truth in unrecalled if truth.verdict is not None]
     escalate = sum(truth.verdict == 'escalate' for truth in reviewed)
     estimate = low = high = None
-    if reviewed:
+    if reviewed and judged:
+        # Reviews are a sample of all unrecalled flags; the rate applies to the same cohort as the floor.
         rate = escalate / len(reviewed)
         low_rate, high_rate = wilson(escalate, len(reviewed))
-        estimate, low, high = (round((recalled + len(unrecalled) * r) / len(flags), 3) for r in (rate, low_rate, high_rate))
+        estimate, low, high = (round((recalled + (len(unrecalled) - censored) * r) / judged, 3)
+                               for r in (rate, low_rate, high_rate))
     return Precision(floor=round(recalled / judged, 3) if judged else None, recalled=recalled, unrecalled=len(unrecalled),
                      censored=censored, reviewed=len(reviewed), escalate=escalate, estimate=estimate, low=low, high=high)
 
@@ -274,9 +280,11 @@ def review_sample(known: Mapping[str, Truth], scores: Mapping[str, float], split
 
 
 def rule_scores(conn, rules: list[lab_rules.Rule], split: Split) -> dict[str, float]:
-    """Score 1 for each report an arrival rule matches. Rolling counts see reports before the split."""
+    """Score 1 for each report the rules flag as Replay would. Rolling counts see reports before the split."""
+    if any(rule.trigger != 'arrival' for rule in rules):
+        raise ValueError('The benchmark evaluates rules as reports arrive, as Replay does. Remove end-of-replay rules.')
     first, last = SPLITS[split]
     lookback = max((condition.window_days for rule in rules for condition in rule.conditions
                     if isinstance(condition, lab_rules.CountCondition)), default=1)
     rows = lab_public.load_rows(conn, first - timedelta(days=lookback - 1), last)
-    return {report.id: 1.0 for report in lab_replay.evaluate(rows, rules, first) if report.rules}
+    return {report.id: 1.0 for report in lab_replay.evaluate(rows, rules, first) if report.flagged}

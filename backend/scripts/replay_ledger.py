@@ -11,6 +11,7 @@ import argparse
 import csv
 import gzip
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from psycopg.rows import dict_row
 
 from cpsc360 import db
 from cpsc360.lab_replay import LEDGER_PATH
-from scripts.watchlist_linkage import link_reports, read_overrides
+from scripts.watchlist_linkage import identifiers, link_reports, model_terms, read_overrides
 from scripts.watchlist_score import EARLIER_ACTIONS, LEDGER, REVIEWS, read_json
 
 # Reviews that decided only the strict tier, as `strict` yes/no.
@@ -27,6 +28,31 @@ STRICT_REVIEWS = ('watchlist-blind-review.csv', 'watchlist-2012-review.csv', 'wa
                   'watchlist-historical-reachable.csv')
 # A replay can run for years, so a covered model counts however long CPSC took to act.
 HORIZON_DAYS = 100_000
+# Battery sizes and voltages read like model numbers but name parts shared by many products.
+PART_CODE = re.compile(r'(?:cr|lr|sr|ag)\d+|\d+v(?:ac|dc)')
+
+
+def model_like(code):
+    """A code from a report's free text counts as a model only when it reads like one.
+
+    Text is full of "3-way", "2-burner", "Hover-1" or "1080p", which the strict tier would
+    otherwise match against unrelated notices that use the same words.
+    """
+    return (len(re.findall(r'[a-z]', code)) >= 2 and len(re.findall(r'\d', code)) >= 2
+            and not PART_CODE.fullmatch(code))
+
+
+def text_only_match(report, reason):
+    """Whether every code a strict link matched came from the report's text and none reads like a model."""
+    # `link_reports` writes the reason as "[org] <matched codes> <product words> <hazard words>".
+    words = reason.split()
+    if words[:1] == ['org']:
+        words = words[1:]
+    matched = set(words[0].split(',')) if words else set()
+    text = identifiers(' '.join((report['product_description'] or '', report['incident_description'] or '')))
+    codes, numeric, named = model_terms({**report, 'product_description': '', 'incident_description': ''})
+    return bool(matched) and all(code in text and code not in codes | numeric | named and not model_like(code)
+                                 for code in matched)
 
 
 def reviews():
@@ -46,8 +72,14 @@ def reviews():
 
 
 def build(reports, notices, verdicts, public_on, earlier):
-    links = link_reports(reports, notices, verdicts, horizon=HORIZON_DAYS)
+    candidates = []
+    links = link_reports(reports, notices, verdicts, candidates=candidates, horizon=HORIZON_DAYS)
     published = {r['report_no']: r['publication_date'] for r in reports}
+    by_report = {r['report_no']: r for r in reports}
+    for candidate in candidates:
+        pair = candidate['report_no'], candidate['notice_no']
+        if candidate['strict'] and pair not in verdicts and text_only_match(by_report[pair[0]], candidate['reason']):
+            links[pair[0]].strict.pop(pair[1], None)
     for action in earlier:
         if action['report_no'] in links and date.fromisoformat(action['date']) <= published[action['report_no']]:
             links[action['report_no']].strict.clear()

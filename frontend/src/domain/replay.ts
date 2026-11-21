@@ -1,9 +1,10 @@
 import type { LabReplayLinkedReport, LabReplayRecall, LabReplayReport, LabReplayWindow } from "../api/heuristicLab";
 
 // Replay state for one play-through. Dates are ISO days compared as strings.
-// A report is "flagged" by the first rule that matched it on arrival, or by hand.
+// A report is "flagged" on arrival when its first matching rule sends it for review, or by hand.
 // A recall counts as caught when any covered report was still flagged at the
-// announcement and was flagged on or before its `flag_by` day.
+// announcement and was flagged on or before its `flag_by` day. Marks on a report
+// lock once a recall covering it is announced, so the score can't be revised later.
 
 export type FlagSource = { kind: "rule"; ruleId: number; name: string } | { kind: "hand" };
 export type Mark = { state: "flagged"; on: string; by: FlagSource } | { state: "dismissed"; on: string };
@@ -108,7 +109,7 @@ function reveal(state: ReplayState, { day, reports, recalls }: DayArrival): Repl
   for (const item of reports) {
     const [first] = item.ruleIds;
     if (first === undefined) unmatched += 1;
-    else if (!marks.has(item.report.id)) {
+    else if (item.report.flagged && !marks.has(item.report.id)) {
       marks.set(item.report.id, { state: "flagged", on: day, by: { kind: "rule", ruleId: first, name: item.ruleName ?? "" } });
     }
     for (const id of item.ruleIds) ruleCounts.set(id, (ruleCounts.get(id) ?? 0) + 1);
@@ -130,7 +131,7 @@ export function replayReducer(state: ReplayState, action: ReplayAction): ReplayS
   switch (action.type) {
     case "reveal": return reveal(state, action.arrival);
     case "mark": {
-      if (state.day === null) return state;
+      if (state.day === null || state.recalled.has(action.id)) return state;
       const current = state.marks.get(action.id);
       if (current?.state === action.state) return state;
       const marks = new Map(state.marks);

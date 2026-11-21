@@ -10,6 +10,7 @@ import gzip
 import json
 import re
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import date, timedelta
 from functools import cache
 from pathlib import Path
@@ -25,6 +26,9 @@ MAX_WINDOW_DAYS = 62
 SNIPPET_CHARS = 200
 WAVE_DAYS = 365
 WAVE_OVERLAP = 0.3
+# A report is flagged when the first rule it matches recommends any action but these, as in the Lab.
+NO_FLAG = frozenset({'nfa', 'reject'})
+REANNOUNCE = re.compile(r'\b(?:reannounces|expands)\b', re.I)
 TITLE_FILLER = frozenset('a an and the of for to by with in on at from due recall recalls recalled recalling alert '
                          'expands reannounces announces inc llc co company corp brand'.split())
 
@@ -56,11 +60,13 @@ def title_parts(title: str) -> tuple[str, frozenset[str]]:
                              if word not in TITLE_FILLER and len(word) > 2)
 
 
-def recall_waves(notices: dict[str, tuple[date, str]]) -> dict[str, str]:
+def recall_waves(notices: dict[str, tuple[date, str]], covers: Mapping[str, set[str]]) -> dict[str, str]:
     """Group notices into waves: same hazard clause, overlapping product words, announced within a year.
 
     A wave is one pattern CPSC acted on many times, such as 21 wintergreen-oil packaging notices
     in 2019-2020. Scoring counts each wave once so one rule can't collect a point per notice.
+    A notice that reannounces or expands a recall joins every earlier notice it shares a
+    covered report with, however much later it comes.
     """
     ordered = sorted(notices, key=lambda no: (notices[no][0], no))
     parts = {no: title_parts(notices[no][1]) for no in ordered}
@@ -80,6 +86,11 @@ def recall_waves(notices: dict[str, tuple[date, str]]) -> dict[str, str]:
             if hazard and hazard == other_hazard and words and other_words \
                     and len(words & other_words) / len(words | other_words) >= WAVE_OVERLAP:
                 parent[root(second)] = root(first)
+    for position, second in enumerate(ordered):
+        if REANNOUNCE.search(notices[second][1]):
+            for first in ordered[:position]:
+                if covers.get(first, set()) & covers.get(second, set()):
+                    parent[root(second)] = root(first)
     # Name each wave after its earliest notice, which `ordered` visits first.
     names: dict[str, str] = {}
     return {no: names.setdefault(root(no), no) for no in ordered}
@@ -90,13 +101,22 @@ def ledger() -> Ledger:
     """The strict-tier recall links built by `scripts.replay_ledger`."""
     with gzip.open(LEDGER_PATH, 'rt', encoding='utf-8') as stream:
         raw = json.load(stream)
-    reports: dict[str, list[tuple[str, date]]] = defaultdict(list)
+    covered: dict[str, list[tuple[str, date]]] = defaultdict(list)
     for report_no, notice_no, known in raw['links']:
-        reports[notice_no].append((report_no, date.fromisoformat(known) - timedelta(days=1)))
+        covered[notice_no].append((report_no, date.fromisoformat(known) - timedelta(days=1)))
     announced = {no: (date.fromisoformat(n['announced']), n['title']) for no, n in raw['notices'].items()}
-    waves = recall_waves(announced)
+    waves = recall_waves(announced, {no: {report_no for report_no, _ in links} for no, links in covered.items()})
     notices = {no: Notice(day, title, raw['notices'][no]['url'], waves[no]) for no, (day, title) in announced.items()}
-    return Ledger(raw['method'], date.fromisoformat(raw['snapshot_last']), notices, dict(reports))
+    # A report counts toward its wave's first notice only, so a reannouncement neither adds a
+    # catch nor stretches the lead past CPSC's first action on that model.
+    reports: dict[str, list[tuple[str, date]]] = {no: [] for no in covered}
+    first_in_wave: set[tuple[str, str]] = set()
+    for notice_no in sorted(covered, key=lambda no: (notices[no].announced, no)):
+        for report_no, flag_by in covered[notice_no]:
+            if (report_no, notices[notice_no].wave) not in first_in_wave:
+                first_in_wave.add((report_no, notices[notice_no].wave))
+                reports[notice_no].append((report_no, flag_by))
+    return Ledger(raw['method'], date.fromisoformat(raw['snapshot_last']), notices, reports)
 
 
 class ReplayBounds(BaseModel):
@@ -136,6 +156,7 @@ class ReplayReport(BaseModel):
     snippet: str
     rules: list[int] = Field(description='Positions of the matching rules in the request, in rule order.')
     evidence: list[str] = Field(description='Evidence for the first matching rule.')
+    flagged: bool = Field(description="Whether the first matching rule's action sends the report for review.")
 
 
 class LinkedReport(BaseModel):
@@ -201,6 +222,7 @@ def evaluate(rows: list[dict], rules: list[lab_rules.Rule], since: date) -> list
             id=report.id, published=report.available_on, title=title(row), product=report.product or '',
             snippet=snippet(report.narrative), rules=[position for position, _ in matched],
             evidence=matched[0][1] if matched else [],
+            flagged=bool(matched) and rules[matched[0][0]].action.kind not in NO_FLAG,
         ))
     return reports
 

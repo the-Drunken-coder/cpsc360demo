@@ -41,7 +41,7 @@ function openReport(id: string, tab = "") {
 function ReplayWorkspace({ bounds }: { bounds: LabReplayBounds }) {
   const [range, setRange] = useState({ start: bounds.start, end: bounds.end });
   const [rules, setRules] = useState<RuleDraft[]>([]);
-  const [applied, setApplied] = useState<AppliedRules>({ epoch: 0, from: bounds.start, rules: [], ids: [] });
+  const [applied, setApplied] = useState<AppliedRules>({ from: bounds.start, rules: [], ids: [] });
   const player = useReplayPlayer(range, applied);
   const { state } = player;
   const [cursorId, setCursorId] = useState<string | null>(null);
@@ -55,7 +55,7 @@ function ReplayWorkspace({ bounds }: { bounds: LabReplayBounds }) {
   function restart(next: { start: string; end: string }) {
     setRange(next);
     player.reset(next);
-    setApplied((current) => ({ ...current, epoch: current.epoch + 1, from: next.start }));
+    setApplied((current) => ({ ...current, from: next.start }));
     setCursorId(null);
     setPreviewId(null);
   }
@@ -91,8 +91,8 @@ function ReplayWorkspace({ bounds }: { bounds: LabReplayBounds }) {
     const prepared = prepareTriage(arrival);
     if (!prepared) return;
     setRules(editing.drafts);
-    setApplied((current) => ({ epoch: current.epoch + 1, from: player.upcoming ?? range.end, rules: prepared,
-      ids: arrival.map((rule) => rule.draftId) }));
+    setApplied({ from: player.upcoming ?? range.end, rules: prepared,
+      ids: arrival.map((rule) => rule.draftId) });
     setEditing(null);
   }
 

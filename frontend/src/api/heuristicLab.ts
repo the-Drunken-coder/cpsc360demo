@@ -134,6 +134,8 @@ export interface LabReplayReport {
   /** Positions of the matching rules in the request, in rule order. */
   rules: number[];
   evidence: string[];
+  /** Whether the first matching rule's action sends the report for review. */
+  flagged: boolean;
 }
 
 export interface LabReplayLinkedReport {

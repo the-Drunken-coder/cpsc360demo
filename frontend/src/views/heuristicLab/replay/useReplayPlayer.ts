@@ -15,9 +15,8 @@ export type Speed = typeof SPEEDS[number]["days"];
 const WINDOW_DAYS = 31;
 const MIN_TICK_MS = 100;
 
-/** A rule set and the first day it applies to. Each apply starts a new epoch. */
+/** A rule set and the first day it applies to. */
 export interface AppliedRules {
-  epoch: number;
   from: string;
   rules: LabTriageRule<LabCaseAction>[];
   /** Draft id of each rule, by position. */
@@ -38,7 +37,8 @@ export function useReplayPlayer(range: { start: string; end: string }, applied: 
   const finished = upcoming === null;
   const { start, end } = range;
   const windowQuery = (since: string | null) => ({
-    queryKey: ["heuristic-lab", "replay", start, end, applied.epoch, since],
+    // Keyed by the rules themselves, since cached windows outlive a closed Replay.
+    queryKey: ["heuristic-lab", "replay", start, end, applied.from, applied.rules, applied.ids, since],
     queryFn: async () => {
       const from = since ?? start;
       const last = addDays(from, WINDOW_DAYS - 1);

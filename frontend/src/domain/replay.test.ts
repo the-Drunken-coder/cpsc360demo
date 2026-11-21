@@ -43,6 +43,22 @@ describe("replay scoring", () => {
     expect(score(state)).toMatchObject({ caught: 1, missed: 0, medianLead: 365, flags: 1, flagsWithoutRecall: 0, precision: 1 });
   });
 
+  it("keeps a credited flag once its recall is announced", () => {
+    let state = play(initialReplay("2023-04-01", "2025-09-30"), "2025-08-28", arrivals([RULE]));
+    state = replayReducer(state, { type: "mark", id: RYOBI, state: "dismissed" });
+    expect(score(state)).toMatchObject({ caught: 1, flags: 1, precision: 1 });
+  });
+
+  it("does not flag a report whose first matching rule closes it", () => {
+    const days = arrivals([RULE]);
+    for (const arrival of days.values()) {
+      arrival.reports = arrival.reports.map((item) => ({ ...item, report: { ...item.report, flagged: false } }));
+    }
+    const state = play(initialReplay("2023-04-01", "2025-09-30"), "2025-08-28", days);
+    expect(state.ruleCounts.get(RULE.id)).toBe(1);
+    expect(score(state)).toMatchObject({ caught: 0, missed: 1, flags: 0 });
+  });
+
   it("counts a wave of near-identical notices once", () => {
     const days = arrivals([RULE]);
     const announcement = days.get("2025-08-28");

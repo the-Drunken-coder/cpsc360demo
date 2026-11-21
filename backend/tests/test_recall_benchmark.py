@@ -100,3 +100,49 @@ def test_rules_score_through_the_lab_engine(conn, known):
     scores = bench.rule_scores(conn, [RYOBI_RULE], 'test')
     assert scores[RYOBI_REPORT] == 1.0
     assert all(date(2022, 7, 1) <= known[no].published <= date(2025, 10, 31) for no in scores)
+
+
+def test_words_in_report_text_that_look_like_codes_do_not_link_recalls():
+    # A Hampton Bay table lamp report says "3-way", like a Target floor lamp notice and a lamp socket notice.
+    lamp = '20110519-FBDCE-2147479025'
+    assert all(lamp not in {report_no for report_no, _ in covered} for covered in lab_replay.ledger().reports.values())
+
+
+def test_a_reannounced_recall_is_one_wave_measured_from_the_first_notice(known):
+    # Gree recalled its dehumidifiers in 2013 and reannounced the recall in 2014 and 2016.
+    notices = lab_replay.ledger().notices
+    assert notices['13283'].wave == notices['14179'].wave == notices['17039'].wave
+    result = bench.score(known, {'20120810-D8FCC-2147464905': 1.0}, 'train')
+    assert [(catch.notice_no, catch.lead_days) for catch in result.caught] == [('13283', 361)]
+
+
+def test_rules_flag_only_when_their_first_match_sends_the_report_for_review(conn):
+    close = RYOBI_RULE.model_copy(update={'name': 'Close', 'action': lab_rules.CaseAction(kind='nfa')})
+    assert RYOBI_REPORT not in bench.rule_scores(conn, [close, RYOBI_RULE], 'test')
+    with pytest.raises(ValueError):
+        bench.rule_scores(conn, [RYOBI_RULE.model_copy(update={'trigger': 'end'})], 'test')
+
+
+def test_a_flag_after_the_recall_deadline_is_not_a_hit(known):
+    # A Fitbit report published 2014-02-18 is flagged when its week closes on 02-23, after the 02-20 recall.
+    result = bench.score(known, {'20140123-97EE8-2147447924': 1.0}, 'train')
+    assert (result.flags, result.caught_waves, result.precision.floor) == (1, 0, 0.0)
+
+
+def test_training_labels_wait_for_the_notice_that_lists_the_models():
+    # Samsung warned about top-load washers on 2016-09-28 and listed the models in notice 17028 on 11-04.
+    covered = {report_no for report_no, _ in lab_replay.ledger().reports['17028']}
+    assert not covered & bench.labels_as_of(date(2016, 10, 1))
+    assert covered <= bench.labels_as_of(date(2016, 11, 5))
+
+
+def test_any_supplied_score_ranks_and_missing_scores_abstain(known):
+    assert bench.score(known, {RYOBI_REPORT: -5.0}, 'test').caught_waves == 1
+
+
+def test_estimated_precision_covers_the_same_flags_as_the_floor(conn):
+    recent = '20250716-B2C19-2147329525'  # too recent for "no recall yet" to count against it
+    reviewed = bench.truths(conn, [bench.Review(recent, 'dismiss', 'human', 'check', '')])
+    assert reviewed[recent].censored and not reviewed[recent].links
+    precision = bench.score(reviewed, {RYOBI_REPORT: 2.0, recent: 1.0}, 'test').precision
+    assert (precision.floor, precision.estimate) == (1.0, 1.0)

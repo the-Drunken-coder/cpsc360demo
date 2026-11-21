@@ -28,7 +28,8 @@
     "product": "Microwave Ovens",
     "snippet": "Our microwave oven is turning on by itself. We did a [REDACTED] search to resolve the problem and found the following information. We discovered that this problem has occurred since 2018 with the sam…",
     "rules": [],
-    "evidence": []
+    "evidence": [],
+    "flagged": false
    },
    {
     "id": "20230310-76A00-2147348870",
@@ -37,7 +38,8 @@
     "product": "Dolls, Plush Toys, and Action Figures",
     "snippet": "I don’t think it’s appropriate to market a weighed stuffed animal to a toddler. My 5 year old was gifted this on her birthday in February and she sleeps in the same room as my 2 year old. I think it…",
     "rules": [],
-    "evidence": []
+    "evidence": [],
+    "flagged": false
    },
    {
     "id": "20230313-3EB24-2147348781",
@@ -46,7 +48,8 @@
     "product": "Tableware & Accessories (excluding drinking glass,cups,mugs)",
     "snippet": "I bought clear glass plates from Dollar Tree. The 105\" Moderno Dinner Plate. Upon use, when you scrape across them with a knife or fork, it scratches and puts little chards of glass in your food.",
     "rules": [],
-    "evidence": []
+    "evidence": [],
+    "flagged": false
    },
    {
     "id": "20230316-6CAB4-2147348698",
@@ -55,7 +58,8 @@
     "product": "Electric Blenders",
     "snippet": "I saw an 11 week old infant for follow up for poor weight gain today. The infant was taking appropriate volume of feedings, with normal voiding and stooling, and without other gastrointestinal sympto…",
     "rules": [],
-    "evidence": []
+    "evidence": [],
+    "flagged": false
    },
    {
     "id": "20230317-9D96B-2147348684",
@@ -64,7 +68,8 @@
     "product": "Building Sets",
     "snippet": "Magnetics balls Kids were playing with magnetic balls at school simulating piercing. My daughter and friends simulated piercing in the nose. The magnets when up and magnet had to be removed at hospit…",
     "rules": [],
-    "evidence": []
+    "evidence": [],
+    "flagged": false
    },
    {
     "id": "20230323-17880-2147348520",
@@ -73,7 +78,8 @@
     "product": "Other Cookware",
     "snippet": "the product is skipping while heating and doesnt heat the food i am scared it my explode",
     "rules": [],
-    "evidence": []
+    "evidence": [],
+    "flagged": false
    },
    {
     "id": "20230324-B2A32-2147348506",
@@ -86,7 +92,8 @@
     ],
     "evidence": [
      "narrative: contains any pressure washer"
-    ]
+    ],
+    "flagged": true
    }
   ],
   "recalls": []
