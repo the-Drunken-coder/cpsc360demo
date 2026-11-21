@@ -5,7 +5,7 @@ import re
 import secrets
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import JSONResponse
 from psycopg.types.json import Jsonb
 
-from . import ai_hazards, opencode_go, analytics, ingest, models as m, workspace as w
+from . import ai_hazards, opencode_go, analytics, heuristic_lab as lab, ingest, lab_public, lab_rules, models as m, workspace as w
 from .derive import HAZARD_LABELS
 from .search import FACETS, JOIN, connection, filters_sql, index, pair_reasons, reports, summaries, summary
 from .source_csv import COLUMNS, INCIDENT_COLUMNS
@@ -480,3 +480,47 @@ async def classify_hazards(body: m.AISelection, actor: Writer):
         if status in (401, 403, 429):
             raise HTTPException(502, result.error)
     return [result for result, _ in results]
+
+
+@app.get('/api/heuristic-lab/scenario', response_model=lab.ScenarioView)
+def lab_scenario(actor: Auth, as_of: date | None = None):
+    with connection() as conn:
+        return lab_public.preview(conn, as_of)
+
+
+@app.get('/api/heuristic-lab/runs', response_model=list[lab.RunSummary])
+def lab_runs(actor: Auth):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT id, created_at, result->>'start' start, result->>'end' end "
+            "FROM workspace.heuristic_run WHERE actor_id=%s ORDER BY id DESC LIMIT 25", (actor.id,)
+        ).fetchall()
+
+
+def lab_saved(row):
+    return lab.SavedRun(id=row['id'], created_at=row['created_at'], start=row['result']['start'],
+                        end=row['result']['end'], result=row['result'])
+
+
+def find_lab_run(conn, id, actor):
+    row = conn.execute('SELECT * FROM workspace.heuristic_run WHERE id=%s AND actor_id=%s', (id, actor.id)).fetchone()
+    if not row:
+        raise HTTPException(404, 'Lab run not found.')
+    return row
+
+
+@app.get('/api/heuristic-lab/runs/{id}', response_model=lab.SavedRun)
+def get_lab_run(id: int, actor: Auth):
+    with connection() as conn:
+        return lab_saved(find_lab_run(conn, id, actor))
+
+
+@app.post('/api/heuristic-lab/runs', status_code=201, response_model=lab.SavedRun)
+def create_lab_run(body: lab.RunInput[lab_rules.CaseAction], actor: Writer):
+    with connection() as conn:
+        result = lab_public.replay(conn, body).model_dump(mode='json')
+        row = conn.execute('INSERT INTO workspace.heuristic_run (actor_id,result) VALUES (%s,%s) RETURNING *',
+                           (actor.id, Jsonb(result))).fetchone()
+        w.audit(conn, actor, 'heuristic_run.create', 'heuristic_run', row['id'],
+                after={key: result[key] for key in ('scenario', 'evaluator', 'start', 'end')})
+        return lab_saved(row)

@@ -1,0 +1,116 @@
+{
+  "10": {
+    "rules": [
+      "child access to button battery",
+      "child-resistant feature missing",
+      "identified model with product-specific failure"
+    ],
+    "steps": [
+      {
+        "toggled": "identified model with product-specific failure",
+        "reports": 4690,
+        "flags": 175,
+        "strict": 34,
+        "loose": 38,
+        "notices": 25,
+        "reachable": 34,
+        "prior": 16,
+        "median_days": 143.0
+      },
+      {
+        "toggled": "child-resistant feature missing",
+        "reports": 4690,
+        "flags": 177,
+        "strict": 35,
+        "loose": 39,
+        "notices": 26,
+        "reachable": 34,
+        "prior": 16,
+        "median_days": 140
+      },
+      {
+        "toggled": "child access to button battery",
+        "reports": 4690,
+        "flags": 180,
+        "strict": 36,
+        "loose": 40,
+        "notices": 27,
+        "reachable": 34,
+        "prior": 16,
+        "median_days": 139.5
+      }
+    ]
+  },
+  "30": {
+    "rules": [
+      "child access to button battery",
+      "child-resistant feature missing",
+      "identified model with product-specific failure",
+      "original mechanism"
+    ],
+    "steps": [
+      {
+        "toggled": "identified model with product-specific failure",
+        "reports": 4690,
+        "flags": 175,
+        "strict": 34,
+        "loose": 38,
+        "notices": 25,
+        "reachable": 34,
+        "prior": 16,
+        "median_days": 143.0
+      },
+      {
+        "toggled": "child-resistant feature missing",
+        "reports": 4690,
+        "flags": 177,
+        "strict": 35,
+        "loose": 39,
+        "notices": 26,
+        "reachable": 34,
+        "prior": 16,
+        "median_days": 140
+      },
+      {
+        "toggled": "child access to button battery",
+        "reports": 4690,
+        "flags": 180,
+        "strict": 36,
+        "loose": 40,
+        "notices": 27,
+        "reachable": 34,
+        "prior": 16,
+        "median_days": 139.5
+      },
+      {
+        "toggled": "original mechanism",
+        "reports": 4690,
+        "flags": 191,
+        "strict": 37,
+        "loose": 41,
+        "notices": 28,
+        "reachable": 34,
+        "prior": 17,
+        "median_days": 139
+      }
+    ]
+  },
+  "transfer": {
+    "rules": [
+      "identified model with product-specific failure"
+    ],
+    "steps": [
+      {
+        "toggled": "identified model with product-specific failure",
+        "reports": 4690,
+        "flags": 175,
+        "strict": 34,
+        "loose": 38,
+        "notices": 25,
+        "reachable": 34,
+        "prior": 16,
+        "median_days": 143.0
+      }
+    ]
+  }
+}

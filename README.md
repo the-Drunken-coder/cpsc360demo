@@ -16,6 +16,10 @@ This is a prototype. It uses public data only, it has no connection to internal 
 6. **Summary.** A generated summary where every claim lists the reports it counts. It is built from a template, so it cannot cite a report it did not use.
 7. **Analytics.** Trends by product, manufacturer, hazard, or severity, a breakdown, and a table of unusual increases. Every bar, point, and row opens the exact reports behind it.
 
+8. **Heuristic Lab.** Compare two sets of triage rules on three months of SaferProducts.gov reports in publication-date order. Saved runs show recommendations, evidence, and links to the public reports in Explorer.
+
+In the Heuristic Lab, **Add a rule** combines conditions to recommend a case action such as an in-depth investigation or IPT discussion. When several rules match a report at the same time, the first match supplies the recommendation. Earlier reports can inform rolling counts. Both arrival and end-of-replay checks recommend actions for reports published during the replay. The Lab uses the current public snapshot and simulates the recommendations.
+
 Every value carries its provenance:
 
 | Tier | Meaning |
@@ -41,6 +45,8 @@ cd ..
 scripts/dev-api.sh                                  # API on 127.0.0.1:8000; the first start builds the text index (~1 min)
 cd frontend && npm ci && npm run dev                # UI on http://localhost:5173
 ```
+
+For an existing database, rerun `.venv/bin/python -m cpsc360.ingest init-db` from `backend` to add the Heuristic Lab table.
 
 Ingestion commands are idempotent. Rerunning `bulk` or `sync` over the same data changes nothing.
 
@@ -68,3 +74,5 @@ cd frontend && npm test && npm run build
 - `backend/cpsc360/app.py` serves the API. `search.py` holds the shared filter builder and text index, and `workspace.py` holds investigations, patterns, and summaries.
 - `frontend/src` is React, TypeScript, and Blueprint, organized by view.
 - `docs/api.md` is the API contract. `docs/data-source.md` records how SaferProducts.gov publishes its data. `docs/decisions.tsv` logs the build decisions.
+
+Historical recall replays trace public complaints to later CPSC actions and compare early-warning rules and review volumes. [Recall replay findings](docs/recall-early-warning.md)

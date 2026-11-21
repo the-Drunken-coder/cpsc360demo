@@ -9,6 +9,7 @@ import { HotkeysHelp, useRegisteredHotkeys } from "./hotkeys/registry";
 import { SelectionProvider } from "./session/SelectionProvider";
 import { SessionProvider } from "./session/SessionProvider";
 import { AnalyticsView } from "./views/analytics/AnalyticsView";
+import { HeuristicLabView } from "./views/heuristicLab/HeuristicLabView";
 import { CompareView } from "./views/compare/CompareView";
 import { ExplorerView } from "./views/explorer/ExplorerView";
 import { IncidentView } from "./views/incident/IncidentView";
@@ -43,6 +44,7 @@ export function App() {
 const NAV = [
   { to: "/", label: "Explorer", icon: "search-template", end: true },
   { to: "/analytics", label: "Analytics", icon: "timeline-bar-chart", end: false },
+  { to: "/heuristic-lab", label: "Heuristic Lab", icon: "lab-test", end: false },
   { to: "/investigations", label: "Investigations", icon: "folder-shared", end: false },
   { to: "/source", label: "Source", icon: "database", end: false },
   { to: "/settings", label: "Settings", icon: "cog", end: false },
@@ -90,6 +92,7 @@ function Shell() {
           <Route path="/investigations" element={<InvestigationsList />} />
           <Route path="/investigations/:id" element={<InvestigationView />} />
           <Route path="/investigations/:id/:tab" element={<InvestigationView />} />
+          <Route path="/heuristic-lab/:runId?" element={<HeuristicLabView />} />
           <Route path="/analytics" element={<AnalyticsView />} />
           <Route path="/source" element={<SourceView />} />
         </Routes>

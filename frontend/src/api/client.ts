@@ -1,3 +1,4 @@
+import type { LabRun, LabRunInput, LabRunSummary, LabScenario } from "./heuristicLab";
 import { compactFilters, toSearchParams } from "../domain/filters";
 import type {
   AIHazardResult, GoSettings, AuditEntry, BreakdownDimension, BreakdownResponse, Facets, Filters, IncidentDetail, IncidentPage, IncidentSort,
@@ -76,6 +77,11 @@ async function none(method: string, path: string): Promise<void> {
 const enc = encodeURIComponent;
 
 export const api = {
+  labScenario: (asOf?: string) => json<LabScenario>("GET", "/heuristic-lab/scenario", undefined, { as_of: asOf }),
+  labRuns: () => json<LabRunSummary[]>("GET", "/heuristic-lab/runs"),
+  labRun: (id: string) => json<LabRun>("GET", `/heuristic-lab/runs/${encodeURIComponent(id)}`),
+  runLab: (body: LabRunInput) => json<LabRun>("POST", "/heuristic-lab/runs", body),
+
   goSettings: () => json<GoSettings>("GET", "/settings/opencode-go"),
   goModels: () => json<string[]>("GET", "/settings/opencode-go/models"),
   saveGoSettings: (body: { api_key?: string; model?: string }) => json<GoSettings>("PUT", "/settings/opencode-go", body),
