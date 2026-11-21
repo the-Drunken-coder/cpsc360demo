@@ -104,14 +104,19 @@ def test_rules_score_through_the_lab_engine(conn, known):
 
 def test_words_in_report_text_that_look_like_codes_do_not_link_recalls():
     # A Hampton Bay table lamp report says "3-way", like a Target floor lamp notice and a lamp socket notice.
-    lamp = '20110519-FBDCE-2147479025'
-    assert all(lamp not in {report_no for report_no, _ in covered} for covered in lab_replay.ledger().reports.values())
+    # An iPhone report says "256GB", like a MacBook Pro notice.
+    for report_no in ('20110519-FBDCE-2147479025', '20170224-7D0A7-2147405766'):
+        assert all(report_no not in {linked for linked, _ in covered} for covered in lab_replay.ledger().reports.values())
 
 
 def test_a_reannounced_recall_is_one_wave_measured_from_the_first_notice(known):
     # Gree recalled its dehumidifiers in 2013 and reannounced the recall in 2014 and 2016.
     notices = lab_replay.ledger().notices
     assert notices['13283'].wave == notices['14179'].wave == notices['17039'].wave
+    assert notices['23034'].wave == notices['24181'].wave  # "Major Recall Expansion" of Black+Decker steamers
+    # Textron's crash recall expansion shares vehicles with its fire recall, which stays its own wave with its reports.
+    assert notices['25701'].wave == notices['24709'].wave != notices['24229'].wave
+    assert lab_replay.ledger().reports['24229']
     result = bench.score(known, {'20120810-D8FCC-2147464905': 1.0}, 'train')
     assert [(catch.notice_no, catch.lead_days) for catch in result.caught] == [('13283', 361)]
 
@@ -145,4 +150,4 @@ def test_estimated_precision_covers_the_same_flags_as_the_floor(conn):
     reviewed = bench.truths(conn, [bench.Review(recent, 'dismiss', 'human', 'check', '')])
     assert reviewed[recent].censored and not reviewed[recent].links
     precision = bench.score(reviewed, {RYOBI_REPORT: 2.0, recent: 1.0}, 'test').precision
-    assert (precision.floor, precision.estimate) == (1.0, 1.0)
+    assert (precision.floor, precision.reviewed, precision.estimate) == (1.0, 0, None)

@@ -101,10 +101,12 @@ export function RulesColumn({ rules, counts, unmatched, appliesFrom, onNew, onEd
   </section>;
 }
 
-export function FeedColumn({ day, feed, marks, cursorId, onCursor, onOpen, onMark }: {
+export function FeedColumn({ day, feed, marks, recalled, cursorId, onCursor, onOpen, onMark }: {
   day: string | null;
   feed: FeedItem[];
   marks: ReadonlyMap<string, Mark>;
+  /** Reports a recall has covered. Their marks are locked. */
+  recalled: ReadonlyMap<string, string>;
   cursorId: string | null;
   onCursor: (id: string) => void;
   onOpen: (id: string) => void;
@@ -134,6 +136,8 @@ export function FeedColumn({ day, feed, marks, cursorId, onCursor, onOpen, onMar
         {group.items.map(({ report, ruleName }) => {
           const mark = marks.get(report.id);
           const handFlag = mark?.state === "flagged" && mark.by.kind === "hand";
+          const locked = recalled.has(report.id);
+          const lockNote = "Recalled. The mark is locked.";
           return <article key={report.id} className="replay-report" data-cursor={report.id === cursorId || undefined}
             data-mark={mark?.state} onClick={() => { onCursor(report.id); onOpen(report.id); }}>
             <div className="replay-report-top">
@@ -143,9 +147,9 @@ export function FeedColumn({ day, feed, marks, cursorId, onCursor, onOpen, onMar
               {handFlag && <span className="replay-tag" data-kind="hand">flagged</span>}
               {mark?.state === "dismissed" && <span className="replay-muted">dismissed</span>}
               <span className="replay-report-actions">
-                <Button small minimal icon="flag" aria-label="Flag" title="Flag (F)" active={mark?.state === "flagged"}
+                <Button small minimal icon="flag" aria-label="Flag" title={locked ? lockNote : "Flag (F)"} active={mark?.state === "flagged"} disabled={locked}
                   onClick={(event) => { event.stopPropagation(); onMark(report.id, "flagged"); }} />
-                <Button small minimal icon="cross" aria-label="Dismiss" title="Dismiss (D)" active={mark?.state === "dismissed"}
+                <Button small minimal icon="cross" aria-label="Dismiss" title={locked ? lockNote : "Dismiss (D)"} active={mark?.state === "dismissed"} disabled={locked}
                   onClick={(event) => { event.stopPropagation(); onMark(report.id, "dismissed"); }} />
               </span>
             </div>

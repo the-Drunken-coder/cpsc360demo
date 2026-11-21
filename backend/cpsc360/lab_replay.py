@@ -28,7 +28,7 @@ WAVE_DAYS = 365
 WAVE_OVERLAP = 0.3
 # A report is flagged when the first rule it matches recommends any action but these, as in the Lab.
 NO_FLAG = frozenset({'nfa', 'reject'})
-REANNOUNCE = re.compile(r'\b(?:reannounces|expands)\b', re.I)
+REANNOUNCE = re.compile(r'\b(?:reannounces|expands|expansion)\b', re.I)
 TITLE_FILLER = frozenset('a an and the of for to by with in on at from due recall recalls recalled recalling alert '
                          'expands reannounces announces inc llc co company corp brand'.split())
 
@@ -65,8 +65,9 @@ def recall_waves(notices: dict[str, tuple[date, str]], covers: Mapping[str, set[
 
     A wave is one pattern CPSC acted on many times, such as 21 wintergreen-oil packaging notices
     in 2019-2020. Scoring counts each wave once so one rule can't collect a point per notice.
-    A notice that reannounces or expands a recall joins every earlier notice it shares a
-    covered report with, however much later it comes.
+    A notice that reannounces or expands a recall joins earlier notices it shares a covered
+    report with, however much later it comes, when they name the same hazard or it names none.
+    One firm's recalls of the same vehicles for crash and for fire stay apart.
     """
     ordered = sorted(notices, key=lambda no: (notices[no][0], no))
     parts = {no: title_parts(notices[no][1]) for no in ordered}
@@ -88,8 +89,9 @@ def recall_waves(notices: dict[str, tuple[date, str]], covers: Mapping[str, set[
                 parent[root(second)] = root(first)
     for position, second in enumerate(ordered):
         if REANNOUNCE.search(notices[second][1]):
+            hazard = parts[second][0]
             for first in ordered[:position]:
-                if covers.get(first, set()) & covers.get(second, set()):
+                if hazard in ('', parts[first][0]) and covers.get(first, set()) & covers.get(second, set()):
                     parent[root(second)] = root(first)
     # Name each wave after its earliest notice, which `ordered` visits first.
     names: dict[str, str] = {}

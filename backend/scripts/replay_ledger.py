@@ -28,8 +28,8 @@ STRICT_REVIEWS = ('watchlist-blind-review.csv', 'watchlist-2012-review.csv', 'wa
                   'watchlist-historical-reachable.csv')
 # A replay can run for years, so a covered model counts however long CPSC took to act.
 HORIZON_DAYS = 100_000
-# Battery sizes and voltages read like model numbers but name parts shared by many products.
-PART_CODE = re.compile(r'(?:cr|lr|sr|ag)\d+|\d+v(?:ac|dc)')
+# Battery sizes, voltages and storage sizes read like model numbers but are shared by many products.
+PART_CODE = re.compile(r'(?:cr|lr|sr|ag)\d+|\d+v(?:ac|dc)|\d+(?:gb|tb|mb)')
 
 
 def model_like(code):

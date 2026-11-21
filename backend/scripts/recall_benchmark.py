@@ -8,7 +8,7 @@ Run from backend:
   python -m scripts.recall_benchmark export --out reports.jsonl.gz --labels-as-of 2019-01-01
   python -m scripts.recall_benchmark ml-baseline --split dev --out dev-scores.csv
 
-A scores file is CSV with columns report_no,score. Higher is more urgent; zero or missing is never flagged.
+A scores file is CSV with columns report_no,score. Higher is more urgent. Any number ranks; leave a report out to abstain.
 """
 
 import argparse

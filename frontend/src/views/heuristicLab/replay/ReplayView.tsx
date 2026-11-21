@@ -117,7 +117,7 @@ function ReplayWorkspace({ bounds }: { bounds: LabReplayBounds }) {
         appliesFrom={started && applied.from > range.start && applied.rules.length > 0 ? applied.from : null}
         onNew={() => edit([...rules, newRule()], rules.length)}
         onEdit={(index) => edit(rules, index)} />
-      <FeedColumn day={state.day} feed={state.feed} marks={state.marks} cursorId={cursor?.report.id ?? null}
+      <FeedColumn day={state.day} feed={state.feed} marks={state.marks} recalled={state.recalled} cursorId={cursor?.report.id ?? null}
         onCursor={setCursorId} onOpen={openPreview} onMark={player.mark} />
       {previewId ? <PreviewPanel reportNo={previewId} onClose={() => setPreviewId(null)}
         onOpen={() => openReport(previewId)} onRelated={() => openReport(previewId, "/related")} />

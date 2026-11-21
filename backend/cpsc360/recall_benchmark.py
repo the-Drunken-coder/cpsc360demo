@@ -243,11 +243,11 @@ def precision(flags: list[tuple[Truth, date]]) -> Precision:
     unrecalled = [truth for truth, _ in flags if not truth.links]
     censored = sum(truth.censored for truth in unrecalled)
     judged = len(flags) - censored
-    reviewed = [truth for truth in unrecalled if truth.verdict is not None]
+    # Only reviews of flags old enough to judge count, the same cohort as the floor.
+    reviewed = [truth for truth in unrecalled if truth.verdict is not None and not truth.censored]
     escalate = sum(truth.verdict == 'escalate' for truth in reviewed)
     estimate = low = high = None
     if reviewed and judged:
-        # Reviews are a sample of all unrecalled flags; the rate applies to the same cohort as the floor.
         rate = escalate / len(reviewed)
         low_rate, high_rate = wilson(escalate, len(reviewed))
         estimate, low, high = (round((recalled + (len(unrecalled) - censored) * r) / judged, 3)
@@ -260,7 +260,7 @@ def review_sample(known: Mapping[str, Truth], scores: Mapping[str, float], split
                   seed: int = 0, budget: int = BUDGET) -> list[tuple[str, Sample]]:
     """Unreviewed reports to send to review, shuffled so the reviewer can't tell them apart.
 
-    `size` random unrecalled flags, plus `controls` recalled flags and `controls` random reports
+    `size` random unrecalled flags old enough to judge, plus `controls` recalled flags and `controls` random reports
     from the split. A useful reviewer escalates most recalled reports and few random ones, and
     those two rates are the yardstick for its verdicts on unrecalled flags.
     """
@@ -272,7 +272,7 @@ def review_sample(known: Mapping[str, Truth], scores: Mapping[str, float], split
         ordered = sorted(pool)
         return [(no, sample) for no in rng.sample(ordered, min(count, len(ordered)))]
 
-    picked = (pick((no for no in flagged & reports.keys() if not reports[no].links), size, 'flag')
+    picked = (pick((no for no in flagged & reports.keys() if not reports[no].links and not reports[no].censored), size, 'flag')
               + pick((no for no in flagged & reports.keys() if reports[no].links), controls, 'recalled')
               + pick(reports.keys() - flagged, controls, 'random'))
     rng.shuffle(picked)
