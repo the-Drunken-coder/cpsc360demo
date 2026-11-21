@@ -20,6 +20,15 @@ This is a prototype. It uses public data only, it has no connection to internal 
 
 **Replay** plays any date range of the snapshot forward by publication day. Rules tag reports as they arrive, F and D flag or dismiss by hand, and a scoreboard counts recalls flagged before CPSC announced them. Rule edits apply from the next replay day. Recalls come from `backend/cpsc360/replay-recalls.json.gz`, which links reports to later CPSC notices by listed model (the strict tier of the watchlist linkage, with archived reviews). Rebuild it after loading new reports with `.venv/bin/python -m scripts.replay_ledger` from `backend` (about two minutes).
 
+**Recall benchmark** scores any report ranker, a rule set or a trained model, the same way. Each week the top 3 scored reports are flagged, and the score is recall waves caught before CPSC acted, next to what random flags at the same rate catch. Near-identical notices count as one wave, and leads count up to a year. A report with no recall is unknown, not a false positive: precision against recalls is a floor, and AI or human reviews in `backend/cpsc360/benchmark-reviews.csv` estimate how many unrecalled flags CPSC should have acted on. Splits are train (2011 to 2018), dev (2019 to mid-2022) and test (mid-2022 to October 2025). Train only on labels known before the split you score (`labels_as_of`). From `backend`:
+
+```bash
+.venv/bin/python -m scripts.recall_benchmark score --split dev --rules rules.json   # or --scores scores.csv (report_no,score)
+.venv/bin/python -m scripts.recall_benchmark review --split dev --rules rules.json  # AI reviews unrecalled flags with hidden controls
+.venv/bin/python -m scripts.recall_benchmark check                                 # you re-review AI verdicts blind
+.venv/bin/python -m scripts.recall_benchmark export --out reports.jsonl.gz --labels-as-of 2019-01-01
+```
+
 In the Heuristic Lab, **Add a rule** combines conditions to recommend a case action such as an in-depth investigation or IPT discussion. When several rules match a report at the same time, the first match supplies the recommendation. Earlier reports can inform rolling counts. Both arrival and end-of-replay checks recommend actions for reports published during the replay. The Lab uses the current public snapshot and simulates the recommendations.
 
 Every value carries its provenance:
