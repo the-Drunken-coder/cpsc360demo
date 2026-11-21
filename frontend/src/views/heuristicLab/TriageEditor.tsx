@@ -120,6 +120,23 @@ export function ruleLabel(rule: RuleText) {
   return { name: manualName || automaticRuleName(rule), auto_named: !manualName };
 }
 
+/** Rules ready to send, or undefined while any rule lacks a case action. */
+export function prepareTriage(rules: RuleDraft[]): LabTriageRule<LabCaseAction>[] | undefined {
+  const triage: LabTriageRule<LabCaseAction>[] = [];
+  for (const rule of rules) {
+    if (!rule.action || "value" in rule.action) return undefined;
+    triage.push({
+      ...ruleLabel(rule),
+      match: rule.match,
+      trigger: rule.trigger,
+      action: rule.action,
+      conditions: rule.conditions.map((condition) =>
+        condition.kind === "number" && condition.operator === "unknown" ? { ...condition, value: 0 } : condition),
+    });
+  }
+  return triage;
+}
+
 function Picker<T extends string>({ label, options, value, onChange, format = readable }: {
   label: string;
   options: readonly T[];

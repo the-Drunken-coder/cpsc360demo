@@ -192,7 +192,8 @@ def notice_terms(n):
     )
 
 
-def link_reports(reports, notices, overrides=None, candidates=None):
+def link_reports(reports, notices, overrides=None, candidates=None, horizon=365):
+    """Link reports to notices announced at most `horizon` days after publication."""
     overrides = overrides or {}
     ledger, by_org_word, by_model = {}, defaultdict(set), defaultdict(set)
     for n in notices:
@@ -231,7 +232,7 @@ def link_reports(reports, notices, overrides=None, candidates=None):
         for no in sorted(possible):
             notice = ledger[no]
             lead = (notice.date - pub).days
-            if lead > 365:
+            if lead > horizon:
                 continue
             org_match = any(f" {name} " in f" {notice.organizations} " for name in maker)
             code_match = codes & notice.codes

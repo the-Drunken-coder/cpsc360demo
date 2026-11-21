@@ -107,3 +107,58 @@ export interface LabTriageMatch {
   evidence: string[];
   applied: boolean;
 }
+
+export interface LabReplayBounds {
+  first: string;
+  last: string;
+  start: string;
+  end: string;
+  ledger_method: string;
+  ledger_last: string;
+}
+
+export interface LabReplayInput {
+  start: string;
+  end: string;
+  since: string;
+  until: string;
+  rules: LabTriageRule<LabCaseAction>[];
+}
+
+export interface LabReplayReport {
+  id: string;
+  published: string;
+  title: string;
+  product: string;
+  snippet: string;
+  /** Positions of the matching rules in the request, in rule order. */
+  rules: number[];
+  evidence: string[];
+  /** Whether the first matching rule's action sends the report for review. */
+  flagged: boolean;
+}
+
+export interface LabReplayLinkedReport {
+  id: string;
+  published: string;
+  title: string;
+  /** The last day a flag counts as early. */
+  flag_by: string;
+}
+
+export interface LabReplayRecall {
+  notice_no: string;
+  /** The first notice of its wave of near-identical notices. Scoring counts a wave once. */
+  wave: string;
+  announced: string;
+  title: string;
+  url: string;
+  reports: LabReplayLinkedReport[];
+}
+
+export interface LabReplayWindow {
+  since: string;
+  until: string;
+  reports: LabReplayReport[];
+  recalls: LabReplayRecall[];
+}

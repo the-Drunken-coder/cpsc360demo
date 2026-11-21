@@ -4,14 +4,14 @@ import { type FormEvent, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/client";
-import type { LabCaseAction, LabRules, LabTriageRule } from "../../api/heuristicLab";
+import type { LabCaseAction, LabRules } from "../../api/heuristicLab";
 import { useSession } from "../../session/SessionProvider";
 import { LabHelp } from "./LabHelp";
+import { LAB_PATH, LabModes } from "./LabModes";
 import { RunResults } from "./RunResults";
-import { createRuleDraft, ruleLabel, TriageEditor, type RuleDraft } from "./TriageEditor";
+import { createRuleDraft, prepareTriage, TriageEditor, type RuleDraft } from "./TriageEditor";
 import "./heuristicLab.css";
 
-const LAB_PATH = "/heuristic-lab";
 const SETS = [
   { id: "baseline", title: "Baseline", role: "Reference" },
   { id: "candidate", title: "Candidate", role: "Under test" },
@@ -36,19 +36,8 @@ function scenarioQuery(start?: string) {
 }
 
 function prepareRules(rules: RuleSetDraft): LabRules<LabCaseAction> | undefined {
-  const triage: LabTriageRule<LabCaseAction>[] = [];
-  for (const rule of rules.triage) {
-    if (!rule.action || "value" in rule.action) return undefined;
-    triage.push({
-      ...ruleLabel(rule),
-      match: rule.match,
-      trigger: rule.trigger,
-      action: rule.action,
-      conditions: rule.conditions.map((condition) =>
-        condition.kind === "number" && condition.operator === "unknown" ? { ...condition, value: 0 } : condition),
-    });
-  }
-  return { triage };
+  const triage = prepareTriage(rules.triage);
+  return triage && { triage };
 }
 
 export function HeuristicLabView() {
@@ -130,6 +119,8 @@ function LabWorkspace({ actorId, canWrite }: { actorId: number; canWrite: boolea
         <h1>Heuristic Lab</h1>
         <p>Compare two rule sets on the same public SaferProducts.gov reports.</p>
       </div>
+      <div className="lab-header-actions">
+      <LabModes />
       <Popover placement="bottom-end" minimal content={
         <nav className="lab-history" aria-label="Saved runs">
           <h2>Saved runs</h2>
@@ -146,6 +137,7 @@ function LabWorkspace({ actorId, canWrite }: { actorId: number; canWrite: boolea
       }>
         <Button type="button" icon="history" text="Run history" />
       </Popover>
+      </div>
     </header>
 
     <div className="lab-content">

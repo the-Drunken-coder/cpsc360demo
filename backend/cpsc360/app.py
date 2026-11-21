@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import JSONResponse
 from psycopg.types.json import Jsonb
 
-from . import ai_hazards, opencode_go, analytics, heuristic_lab as lab, ingest, lab_public, lab_rules, models as m, workspace as w
+from . import ai_hazards, opencode_go, analytics, heuristic_lab as lab, ingest, lab_public, lab_replay, lab_rules, models as m, workspace as w
 from .derive import HAZARD_LABELS
 from .search import FACETS, JOIN, connection, filters_sql, index, pair_reasons, reports, summaries, summary
 from .source_csv import COLUMNS, INCIDENT_COLUMNS
@@ -486,6 +486,18 @@ async def classify_hazards(body: m.AISelection, actor: Writer):
 def lab_scenario(actor: Auth, as_of: date | None = None):
     with connection() as conn:
         return lab_public.preview(conn, as_of)
+
+
+@app.get('/api/heuristic-lab/replay', response_model=lab_replay.ReplayBounds)
+def lab_replay_bounds(actor: Auth):
+    with connection() as conn:
+        return lab_replay.bounds(conn)
+
+
+@app.post('/api/heuristic-lab/replay/window', response_model=lab_replay.ReplayWindow)
+def lab_replay_window(body: lab_replay.ReplayInput, actor: Auth):
+    with connection() as conn:
+        return lab_replay.window(conn, body)
 
 
 @app.get('/api/heuristic-lab/runs', response_model=list[lab.RunSummary])
